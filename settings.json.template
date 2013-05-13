@@ -93,7 +93,7 @@
   // You can add as many appenders as you want here:
   "logconfig" :
 	{ "appenders": [
-	    { "type": "console" 
+	    { "type": "file" 
            , "filename": "/var/log/etherpad/etherpad.log"
            , "maxLogSize": 1024
            , "backups": 3 // how many log files there're gonna be at max
