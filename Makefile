@@ -35,7 +35,6 @@ pingpong:
 		gzip -c -9 languages.json > languages.json.gz ;\
 		gzip -c -9 languages.min.js > languages.min.js.gz
 	ls src/locales | grep -v sv.json | grep -v en.json | xargs rm
-	echo 'nmwh8EiZwdqrKldw7bM72Wh5AUnHNqUR' > APIKEY.txt
 	echo done > node_modules/ep_disable_change_author_name/.ep_initialized
 	tar cf - APIKEY.txt doc node_modules settings.json.template src tests tools var \
 		| xz -9 > etherpad-`echo ${VERSION} | tr -d ' '`.tar.xz
