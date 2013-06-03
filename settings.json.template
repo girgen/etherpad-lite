@@ -95,8 +95,8 @@
 	{ "appenders": [
 	    { "type": "file" 
            , "filename": "/var/log/etherpad/etherpad.log"
-           , "maxLogSize": 1024
-           , "backups": 3 // how many log files there're gonna be at max
+           , "maxLogSize": 102400
+           , "backups": 5 // how many log files there're gonna be at max
         }
     /*
 	  , { "type": "logLevelFilter"
