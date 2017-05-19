@@ -42,7 +42,8 @@
                     "host"    : "@dbserver@", 
                     "port"    : "@dbport@", 
                     "password": "", 
-                    "database": "@dbname@"
+                    "database": "@dbname@",
+                    "ssl"     : "true"
                   },
   
   //the default text of a pad
