@@ -20,3 +20,4 @@ bin/etherpad-1.deb
 out
 etherpad-*.tar.xz
 credentials.json
+out/
