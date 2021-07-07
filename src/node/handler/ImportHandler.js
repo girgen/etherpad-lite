@@ -1,3 +1,4 @@
+'use strict';
 /**
  * Handles the import requests
  */
@@ -20,285 +21,247 @@
  * limitations under the License.
  */
 
-var ERR = require("async-stacktrace")
-  , padManager = require("../db/PadManager")
-  , padMessageHandler = require("./PadMessageHandler")
-  , async = require("async")
-  , fs = require("fs")
-  , path = require("path")
-  , settings = require('../utils/Settings')
-  , formidable = require('formidable')
-  , os = require("os")
-  , importHtml = require("../utils/ImportHtml")
-  , importEtherpad = require("../utils/ImportEtherpad")
-  , log4js = require("log4js")
-  , hooks = require("ep_etherpad-lite/static/js/pluginfw/hooks.js");
+const padManager = require('../db/PadManager');
+const padMessageHandler = require('./PadMessageHandler');
+const fs = require('fs').promises;
+const path = require('path');
+const settings = require('../utils/Settings');
+const formidable = require('formidable');
+const os = require('os');
+const importHtml = require('../utils/ImportHtml');
+const importEtherpad = require('../utils/ImportEtherpad');
+const log4js = require('log4js');
+const hooks = require('../../static/js/pluginfw/hooks.js');
 
-//load abiword only if its enabled
-if(settings.abiword != null)
-  var abiword = require("../utils/Abiword");
+const logger = log4js.getLogger('ImportHandler');
 
-//for node 0.6 compatibily, os.tmpDir() only works from 0.8
-var tmpDirectory = process.env.TEMP || process.env.TMPDIR || process.env.TMP || '/tmp';
-  
-/**
- * do a requested import
- */ 
-exports.doImport = function(req, res, padId)
-{
-  var apiLogger = log4js.getLogger("ImportHandler");
-
-  //pipe to a file
-  //convert file to html via abiword
-  //set html in the pad
-  
-  var srcFile, destFile
-    , pad
-    , text
-    , importHandledByPlugin
-    , directDatabaseAccess
-    , useAbiword;
-
-  var randNum = Math.floor(Math.random()*0xFFFFFFFF);
-  
-  // setting flag for whether to use abiword or not
-  useAbiword = (abiword != null);
-
-  async.series([
-    //save the uploaded file to /tmp
-    function(callback) {
-      var form = new formidable.IncomingForm();
-      form.keepExtensions = true;
-      form.uploadDir = tmpDirectory;
-      
-      form.parse(req, function(err, fields, files) { 
-        //the upload failed, stop at this point
-        if(err || files.file === undefined) {
-          if(err) console.warn("Uploading Error: " + err.stack);
-          callback("uploadFailed");
-        }
-        //everything ok, continue
-        else {
-          //save the path of the uploaded file
-          srcFile = files.file.path;
-          callback();
-        }
-      });
-    },
-    
-    //ensure this is a file ending we know, else we change the file ending to .txt
-    //this allows us to accept source code files like .c or .java
-    function(callback) {
-      var fileEnding = path.extname(srcFile).toLowerCase()
-        , knownFileEndings = [".txt", ".doc", ".docx", ".pdf", ".odt", ".html", ".htm", ".etherpad", ".rtf"]
-        , fileEndingKnown = (knownFileEndings.indexOf(fileEnding) > -1);
-      
-      //if the file ending is known, continue as normal
-      if(fileEndingKnown) {
-        callback();
-      }
-      //we need to rename this file with a .txt ending
-      else {
-        if(settings.allowUnknownFileEnds === true){
-          var oldSrcFile = srcFile;
-          srcFile = path.join(path.dirname(srcFile),path.basename(srcFile, fileEnding)+".txt");
-          fs.rename(oldSrcFile, srcFile, callback);
-        }else{
-          console.warn("Not allowing unknown file type to be imported", fileEnding);
-          callback("uploadFailed");
-        }
-      }
-    },
-    function(callback){
-      destFile = path.join(tmpDirectory, "etherpad_import_" + randNum + ".htm");
-
-      // Logic for allowing external Import Plugins
-      hooks.aCallAll("import", {srcFile: srcFile, destFile: destFile}, function(err, result){
-        if(ERR(err, callback)) return callback();
-        if(result.length > 0){ // This feels hacky and wrong..
-          importHandledByPlugin = true;
-        }
-        callback();
-      });
-    },
-    function(callback) {
-      var fileEnding = path.extname(srcFile).toLowerCase()
-      var fileIsEtherpad = (fileEnding === ".etherpad");
-
-      if(fileIsEtherpad){
-        // we do this here so we can see if the pad has quit ea few edits
-        padManager.getPad(padId, function(err, _pad){
-          var headCount = _pad.head;
-          if(headCount >= 10){
-            apiLogger.warn("Direct database Import attempt of a pad that already has content, we wont be doing this")
-            return callback("padHasData");
-          }else{
-            fs.readFile(srcFile, "utf8", function(err, _text){
-              directDatabaseAccess = true;
-              importEtherpad.setPadRaw(padId, _text, function(err){
-                callback();
-              });
-            });
-          }  
-        });
-      }else{
-        callback();
-      }
-    },
-    //convert file to html
-    function(callback) {
-      if(!importHandledByPlugin && !directDatabaseAccess){
-        var fileEnding = path.extname(srcFile).toLowerCase();
-        var fileIsHTML = (fileEnding === ".html" || fileEnding === ".htm");
-        var fileIsTXT = (fileEnding === ".txt");
-        if (fileIsTXT) useAbiword = false; // Don't use abiword for text files
-        // See https://github.com/ether/etherpad-lite/issues/2572
-        if (useAbiword && !fileIsHTML) {
-          abiword.convertFile(srcFile, destFile, "htm", function(err) {
-            //catch convert errors
-            if(err) {
-              console.warn("Converting Error:", err);
-              return callback("convertFailed");
-            } else {
-              callback();
-            }
-          });
-        } else {
-          // if no abiword only rename
-          fs.rename(srcFile, destFile, callback);
-        }
-      }else{
-        callback();
-      }
-    },
-    
-    function(callback) {
-      if (!useAbiword && !directDatabaseAccess){
-        // Read the file with no encoding for raw buffer access.
-        fs.readFile(destFile, function(err, buf) {
-          if (err) throw err;
-          var isAscii = true;
-          // Check if there are only ascii chars in the uploaded file
-          for (var i=0, len=buf.length; i<len; i++) {
-            if (buf[i] > 240) {
-              isAscii=false;
-              break;
-            }
-          }
-          if (isAscii) {
-            callback();
-          } else {
-            callback("uploadFailed");
-          }
-        });
-      } else {
-        callback();
-      }
-    },
-        
-    //get the pad object
-    function(callback) {
-      padManager.getPad(padId, function(err, _pad){
-        if(ERR(err, callback)) return;
-        pad = _pad;
-        callback();
-      });
-    },
-    
-    //read the text
-    function(callback) {
-      if(!directDatabaseAccess){
-        fs.readFile(destFile, "utf8", function(err, _text){
-          if(ERR(err, callback)) return;
-          text = _text;
-          // Title needs to be stripped out else it appends it to the pad..
-          text = text.replace("<title>", "<!-- <title>");
-          text = text.replace("</title>","</title>-->");
-
-          //node on windows has a delay on releasing of the file lock.  
-          //We add a 100ms delay to work around this
-          if(os.type().indexOf("Windows") > -1){
-             setTimeout(function() {callback();}, 100);
-          } else {
-            callback();
-          }
-        });
-      }else{
-        callback();
-      }
-    },
-    
-    //change text of the pad and broadcast the changeset
-    function(callback) {
-      if(!directDatabaseAccess){
-        var fileEnding = path.extname(srcFile).toLowerCase();
-        if (importHandledByPlugin || useAbiword || fileEnding == ".htm" || fileEnding == ".html") {
-          importHtml.setPadHTML(pad, text, function(e){
-            if(e) apiLogger.warn("Error importing, possibly caused by malformed HTML");
-          });
-        } else {
-          pad.setText(text);
-        }
-      }
-
-      // Load the Pad into memory then brodcast updates to all clients
-      padManager.unloadPad(padId);
-      padManager.getPad(padId, function(err, _pad){
-        var pad = _pad;
-        padManager.unloadPad(padId);
-        // direct Database Access means a pad user should perform a switchToPad
-        // and not attempt to recieve updated pad data..
-        if(!directDatabaseAccess){
-          padMessageHandler.updatePadClients(pad, function(){
-            callback();
-          });
-        }else{
-          callback();
-        }
-      });
-
-    },
-    
-    //clean up temporary files
-    function(callback) {
-      if(!directDatabaseAccess){
-        //for node < 0.7 compatible
-        var fileExists = fs.exists || path.exists;
-        async.parallel([
-          function(callback){
-            fileExists (srcFile, function(exist) { (exist)? fs.unlink(srcFile, callback): callback(); });
-          },
-          function(callback){
-            fileExists (destFile, function(exist) { (exist)? fs.unlink(destFile, callback): callback(); });
-          }
-        ], callback);
-      }else{
-        callback();
-      }
-    }
-  ], function(err) {
-    var status = "ok";
-    
-    //check for known errors and replace the status
-    if(err == "uploadFailed" || err == "convertFailed" || err == "padHasData")
-    {
-      status = err;
-      err = null;
-    }
-
-    ERR(err);
-
-    //close the connection
-    res.send(
-      "<head> \
-        <script type='text/javascript' src='../../static/js/jquery.js'></script> \
-      </head> \
-      <script> \
-        $(window).load(function(){ \
-          var impexp = window.parent.padimpexp.handleFrameCall('" + directDatabaseAccess +"', '" + status + "'); \
-        }) \
-      </script>"
-    );
-  });
+// `status` must be a string supported by `importErrorMessage()` in `src/static/js/pad_impexp.js`.
+class ImportError extends Error {
+  constructor(status, ...args) {
+    super(...args);
+    if (Error.captureStackTrace) Error.captureStackTrace(this, ImportError);
+    this.name = 'ImportError';
+    this.status = status;
+    const msg = this.message == null ? '' : String(this.message);
+    if (status !== '') this.message = msg === '' ? status : `${status}: ${msg}`;
+  }
 }
 
+const rm = async (path) => {
+  try {
+    await fs.unlink(path);
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+};
+
+let converter = null;
+let exportExtension = 'htm';
+
+// load abiword only if it is enabled and if soffice is disabled
+if (settings.abiword != null && settings.soffice == null) {
+  converter = require('../utils/Abiword');
+}
+
+// load soffice only if it is enabled
+if (settings.soffice != null) {
+  converter = require('../utils/LibreOffice');
+  exportExtension = 'html';
+}
+
+const tmpDirectory = os.tmpdir();
+
+/**
+ * do a requested import
+ */
+const doImport = async (req, res, padId) => {
+  // pipe to a file
+  // convert file to html via abiword or soffice
+  // set html in the pad
+  const randNum = Math.floor(Math.random() * 0xFFFFFFFF);
+
+  // setting flag for whether to use converter or not
+  let useConverter = (converter != null);
+
+  const form = new formidable.IncomingForm();
+  form.keepExtensions = true;
+  form.uploadDir = tmpDirectory;
+  form.maxFileSize = settings.importMaxFileSize;
+
+  // Ref: https://github.com/node-formidable/formidable/issues/469
+  // Crash in Etherpad was Uploading Error: Error: Request aborted
+  // [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+  form.onPart = (part) => {
+    form.handlePart(part);
+    if (part.filename !== undefined) {
+      form.openedFiles[form.openedFiles.length - 1]._writeStream.on('error', (err) => {
+        form.emit('error', err);
+      });
+    }
+  };
+
+  // locally wrapped Promise, since form.parse requires a callback
+  let srcFile = await new Promise((resolve, reject) => {
+    form.parse(req, (err, fields, files) => {
+      if (err != null) {
+        logger.warn(`Import failed due to form error: ${err.stack || err}`);
+        // I hate doing indexOf here but I can't see anything to use...
+        if (err && err.stack && err.stack.indexOf('maxFileSize') !== -1) {
+          return reject(new ImportError('maxFileSize'));
+        }
+        return reject(new ImportError('uploadFailed'));
+      }
+      if (!files.file) {
+        logger.warn('Import failed because form had no file');
+        return reject(new ImportError('uploadFailed'));
+      }
+      resolve(files.file.path);
+    });
+  });
+
+  // ensure this is a file ending we know, else we change the file ending to .txt
+  // this allows us to accept source code files like .c or .java
+  const fileEnding = path.extname(srcFile).toLowerCase();
+  const knownFileEndings =
+    ['.txt', '.doc', '.docx', '.pdf', '.odt', '.html', '.htm', '.etherpad', '.rtf'];
+  const fileEndingUnknown = (knownFileEndings.indexOf(fileEnding) < 0);
+
+  if (fileEndingUnknown) {
+    // the file ending is not known
+
+    if (settings.allowUnknownFileEnds === true) {
+      // we need to rename this file with a .txt ending
+      const oldSrcFile = srcFile;
+
+      srcFile = path.join(path.dirname(srcFile), `${path.basename(srcFile, fileEnding)}.txt`);
+      await fs.rename(oldSrcFile, srcFile);
+    } else {
+      logger.warn(`Not allowing unknown file type to be imported: ${fileEnding}`);
+      throw new ImportError('uploadFailed');
+    }
+  }
+
+  const destFile = path.join(tmpDirectory, `etherpad_import_${randNum}.${exportExtension}`);
+
+  // Logic for allowing external Import Plugins
+  const result = await hooks.aCallAll('import', {srcFile, destFile, fileEnding});
+  const importHandledByPlugin = (result.length > 0); // This feels hacky and wrong..
+
+  const fileIsEtherpad = (fileEnding === '.etherpad');
+  const fileIsHTML = (fileEnding === '.html' || fileEnding === '.htm');
+  const fileIsTXT = (fileEnding === '.txt');
+
+  let directDatabaseAccess = false;
+  if (fileIsEtherpad) {
+    // we do this here so we can see if the pad has quite a few edits
+    const _pad = await padManager.getPad(padId);
+    const headCount = _pad.head;
+
+    if (headCount >= 10) {
+      logger.warn('Aborting direct database import attempt of a pad that already has content');
+      throw new ImportError('padHasData');
+    }
+
+    const _text = await fs.readFile(srcFile, 'utf8');
+    directDatabaseAccess = true;
+    await importEtherpad.setPadRaw(padId, _text);
+  }
+
+  // convert file to html if necessary
+  if (!importHandledByPlugin && !directDatabaseAccess) {
+    if (fileIsTXT) {
+      // Don't use converter for text files
+      useConverter = false;
+    }
+
+    // See https://github.com/ether/etherpad-lite/issues/2572
+    if (fileIsHTML || !useConverter) {
+      // if no converter only rename
+      await fs.rename(srcFile, destFile);
+    } else {
+      try {
+        await converter.convertFile(srcFile, destFile, exportExtension);
+      } catch (err) {
+        logger.warn(`Converting Error: ${err.stack || err}`);
+        throw new ImportError('convertFailed');
+      }
+    }
+  }
+
+  if (!useConverter && !directDatabaseAccess) {
+    // Read the file with no encoding for raw buffer access.
+    const buf = await fs.readFile(destFile);
+
+    // Check if there are only ascii chars in the uploaded file
+    const isAscii = !Array.prototype.some.call(buf, (c) => (c > 240));
+
+    if (!isAscii) {
+      logger.warn('Attempt to import non-ASCII file');
+      throw new ImportError('uploadFailed');
+    }
+  }
+
+  // get the pad object
+  let pad = await padManager.getPad(padId);
+
+  // read the text
+  let text;
+
+  if (!directDatabaseAccess) {
+    text = await fs.readFile(destFile, 'utf8');
+
+    // node on windows has a delay on releasing of the file lock.
+    // We add a 100ms delay to work around this
+    if (os.type().indexOf('Windows') > -1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+
+  // change text of the pad and broadcast the changeset
+  if (!directDatabaseAccess) {
+    if (importHandledByPlugin || useConverter || fileIsHTML) {
+      try {
+        await importHtml.setPadHTML(pad, text);
+      } catch (err) {
+        logger.warn(`Error importing, possibly caused by malformed HTML: ${err.stack || err}`);
+      }
+    } else {
+      await pad.setText(text);
+    }
+  }
+
+  // Load the Pad into memory then broadcast updates to all clients
+  padManager.unloadPad(padId);
+  pad = await padManager.getPad(padId);
+  padManager.unloadPad(padId);
+
+  // direct Database Access means a pad user should perform a switchToPad
+  // and not attempt to receive updated pad data
+  if (directDatabaseAccess) return true;
+
+  // tell clients to update
+  await padMessageHandler.updatePadClients(pad);
+
+  // clean up temporary files
+  rm(srcFile);
+  rm(destFile);
+
+  return false;
+};
+
+exports.doImport = async (req, res, padId) => {
+  let httpStatus = 200;
+  let code = 0;
+  let message = 'ok';
+  let directDatabaseAccess;
+  try {
+    directDatabaseAccess = await doImport(req, res, padId);
+  } catch (err) {
+    const known = err instanceof ImportError && err.status;
+    if (!known) logger.error(`Internal error during import: ${err.stack || err}`);
+    httpStatus = known ? 400 : 500;
+    code = known ? 1 : 2;
+    message = known ? err.status : 'internalError';
+  }
+  res.status(httpStatus).json({code, message, data: {directDatabaseAccess}});
+};

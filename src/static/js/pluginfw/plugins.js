@@ -1,183 +1,176 @@
-var npm = require("npm/lib/npm.js");
-var readInstalled = require("./read-installed.js");
-var path = require("path");
-var async = require("async");
-var fs = require("fs");
-var tsort = require("./tsort");
-var util = require("util");
-var _ = require("underscore");
+'use strict';
 
-var pluginUtils = require('./shared');
+const fs = require('fs').promises;
+const hooks = require('./hooks');
+const log4js = require('log4js');
+const path = require('path');
+const runCmd = require('../../../node/utils/run_cmd');
+const tsort = require('./tsort');
+const pluginUtils = require('./shared');
+const defs = require('./plugin_defs');
+
+const logger = log4js.getLogger('plugins');
+
+// Log the version of npm at startup.
+(async () => {
+  try {
+    const version = await runCmd(['npm', '--version'], {stdio: [null, 'string']});
+    logger.info(`npm --version: ${version}`);
+  } catch (err) {
+    logger.error(`Failed to get npm version: ${err.stack || err}`);
+    // This isn't a fatal error so don't re-throw.
+  }
+})();
 
 exports.prefix = 'ep_';
-exports.loaded = false;
-exports.plugins = {};
-exports.parts = [];
-exports.hooks = {};
 
-exports.ensure = function (cb) {
-  if (!exports.loaded)
-    exports.update(cb);
-  else
-    cb();
-};
+exports.formatPlugins = () => Object.keys(defs.plugins).join(', ');
 
-exports.formatPlugins = function () {
-  return _.keys(exports.plugins).join(", ");
-};
+exports.formatParts = () => defs.parts.map((part) => part.full_name).join('\n');
 
-exports.formatPluginsWithVersion = function () {
-  var plugins = [];
-  _.forEach(exports.plugins, function(plugin){
-    if(plugin.package.name !== "ep_etherpad-lite"){
-      var pluginStr = plugin.package.name + "@" + plugin.package.version;
-      plugins.push(pluginStr);
-    }
-  });
-  return plugins.join(", ");
-};
-
-exports.formatParts = function () {
-  return _.map(exports.parts, function (part) { return part.full_name; }).join("\n");
-};
-
-exports.formatHooks = function (hook_set_name) {
-  var res = [];
-  var hooks = pluginUtils.extractHooks(exports.parts, hook_set_name || "hooks");
-
-  _.chain(hooks).keys().forEach(function (hook_name) {
-    _.forEach(hooks[hook_name], function (hook) {
-      res.push("<dt>" + hook.hook_name + "</dt><dd>" + hook.hook_fn_name + " from " + hook.part.full_name + "</dd>");
-    });
-  });
-  return "<dl>" + res.join("\n") + "</dl>";
-};
-
-exports.callInit = function (cb) {
-  var hooks = require("./hooks");
-  async.map(
-    Object.keys(exports.plugins),
-    function (plugin_name, cb) {
-      var plugin = exports.plugins[plugin_name];
-      fs.stat(path.normalize(path.join(plugin.package.path, ".ep_initialized")), function (err, stats) {
-        if (err) {
-          async.waterfall([
-            function (cb) { fs.writeFile(path.normalize(path.join(plugin.package.path, ".ep_initialized")), 'done', cb); },
-            function (cb) { hooks.aCallAll("init_" + plugin_name, {}, cb); },
-            cb,
-          ]);
-        } else {
-          cb();
+exports.formatHooks = (hookSetName, html) => {
+  let hooks = new Map();
+  for (const [pluginName, def] of Object.entries(defs.plugins)) {
+    for (const part of def.parts) {
+      for (const [hookName, hookFnName] of Object.entries(part[hookSetName] || {})) {
+        let hookEntry = hooks.get(hookName);
+        if (!hookEntry) {
+          hookEntry = new Map();
+          hooks.set(hookName, hookEntry);
         }
-      });
-    },
-    function () { cb(); }
-  );
-}
-
-exports.pathNormalization = function (part, hook_fn_name) {
-  return path.normalize(path.join(path.dirname(exports.plugins[part.plugin].package.path), hook_fn_name));
-}
-
-exports.update = function (cb) {
-  exports.getPackages(function (er, packages) {
-    var parts = [];
-    var plugins = {};
-    // Load plugin metadata ep.json
-    async.forEach(
-      Object.keys(packages),
-      function (plugin_name, cb) {
-        loadPlugin(packages, plugin_name, plugins, parts, cb);
-      },
-      function (err) {
-        if (err) cb(err);
-        exports.plugins = plugins;
-        exports.parts = sortParts(parts);
-        exports.hooks = pluginUtils.extractHooks(exports.parts, "hooks", exports.pathNormalization);
-        exports.loaded = true;
-        exports.callInit(cb);
-      }
-    );
-  });
-  };
-
-exports.getPackages = function (cb) {
-  // Load list of installed NPM packages, flatten it to a list, and filter out only packages with names that
-  var dir = path.resolve(npm.dir, '..');
-  readInstalled(dir, function (er, data) {
-    if (er) cb(er, null);
-    var packages = {};
-    function flatten(deps) {
-      _.chain(deps).keys().each(function (name) {
-        if (name.indexOf(exports.prefix) === 0) {
-          packages[name] = _.clone(deps[name]);
-          // Delete anything that creates loops so that the plugin
-          // list can be sent as JSON to the web client
-          delete packages[name].dependencies;
-          delete packages[name].parent;
+        let pluginEntry = hookEntry.get(pluginName);
+        if (!pluginEntry) {
+          pluginEntry = new Map();
+          hookEntry.set(pluginName, pluginEntry);
         }
-      
-        // I don't think we need recursion
-        //if (deps[name].dependencies !== undefined) flatten(deps[name].dependencies);
-      });
+        pluginEntry.set(part.name, hookFnName);
+      }
     }
-  
-    var tmp = {};
-    tmp[data.name] = data;
-    flatten(tmp[data.name].dependencies);
-    cb(null, packages);
-  });
+  }
+  const lines = [];
+  const sortStringKeys = (a, b) => String(a[0]).localeCompare(b[0]);
+  if (html) lines.push('<dl>');
+  hooks = new Map([...hooks].sort(sortStringKeys));
+  for (const [hookName, hookEntry] of hooks) {
+    lines.push(html ? `  <dt>${hookName}:</dt><dd><dl>` : `  ${hookName}:`);
+    const sortedHookEntry = new Map([...hookEntry].sort(sortStringKeys));
+    hooks.set(hookName, sortedHookEntry);
+    for (const [pluginName, pluginEntry] of sortedHookEntry) {
+      lines.push(html ? `    <dt>${pluginName}:</dt><dd><dl>` : `    ${pluginName}:`);
+      const sortedPluginEntry = new Map([...pluginEntry].sort(sortStringKeys));
+      sortedHookEntry.set(pluginName, sortedPluginEntry);
+      for (const [partName, hookFnName] of sortedPluginEntry) {
+        lines.push(html
+          ? `      <dt>${partName}:</dt><dd>${hookFnName}</dd>`
+          : `      ${partName}: ${hookFnName}`);
+      }
+      if (html) lines.push('    </dl></dd>');
+    }
+    if (html) lines.push('  </dl></dd>');
+  }
+  if (html) lines.push('</dl>');
+  return lines.join('\n');
 };
 
-function loadPlugin(packages, plugin_name, plugins, parts, cb) {
-  var plugin_path = path.resolve(packages[plugin_name].path, "ep.json");
-  fs.readFile(
-    plugin_path,
-    function (er, data) {
-      if (er) {
-        console.error("Unable to load plugin definition file " + plugin_path);
-        return cb();
-      }
-      try {
-        var plugin = JSON.parse(data);
-        plugin['package'] = packages[plugin_name];
-        plugins[plugin_name] = plugin;
-        _.each(plugin.parts, function (part) {
-          part.plugin = plugin_name;
-          part.full_name = plugin_name + "/" + part.name;
-          parts[part.full_name] = part;
-        });
-      } catch (ex) {
-        console.error("Unable to parse plugin definition file " + plugin_path + ": " + ex.toString());
-      }
-      cb();
+const callInit = async () => {
+  await Promise.all(Object.keys(defs.plugins).map(async (pluginName) => {
+    const plugin = defs.plugins[pluginName];
+    const epInit = path.join(plugin.package.path, '.ep_initialized');
+    try {
+      await fs.stat(epInit);
+    } catch (err) {
+      await fs.writeFile(epInit, 'done');
+      await hooks.aCallAll(`init_${pluginName}`, {});
     }
-  );
-}
+  }));
+};
 
-function partsToParentChildList(parts) {
-  var res = [];
-  _.chain(parts).keys().forEach(function (name) {
-    _.each(parts[name].post || [], function (child_name)  {
-      res.push([name, child_name]);
-    });
-    _.each(parts[name].pre || [], function (parent_name)  {
-      res.push([parent_name, name]);
-    });
+exports.pathNormalization = (part, hookFnName, hookName) => {
+  const tmp = hookFnName.split(':'); // hookFnName might be something like 'C:\\foo.js:myFunc'.
+  // If there is a single colon assume it's 'filename:funcname' not 'C:\\filename'.
+  const functionName = (tmp.length > 1 ? tmp.pop() : null) || hookName;
+  const moduleName = tmp.join(':') || part.plugin;
+  const packageDir = path.dirname(defs.plugins[part.plugin].package.path);
+  const fileName = path.join(packageDir, moduleName);
+  return `${fileName}:${functionName}`;
+};
+
+exports.update = async () => {
+  const packages = await exports.getPackages();
+  const parts = {}; // Key is full name. sortParts converts this into a topologically sorted array.
+  const plugins = {};
+
+  // Load plugin metadata ep.json
+  await Promise.all(Object.keys(packages).map(async (pluginName) => {
+    logger.info(`Loading plugin ${pluginName}...`);
+    await loadPlugin(packages, pluginName, plugins, parts);
+  }));
+  logger.info(`Loaded ${Object.keys(packages).length} plugins`);
+
+  defs.plugins = plugins;
+  defs.parts = sortParts(parts);
+  defs.hooks = pluginUtils.extractHooks(defs.parts, 'hooks', exports.pathNormalization);
+  defs.loaded = true;
+  await callInit();
+};
+
+exports.getPackages = async () => {
+  logger.info('Running npm to get a list of installed plugins...');
+  // Notes:
+  //   * Do not pass `--prod` otherwise `npm ls` will fail if there is no `package.json`.
+  //   * The `--no-production` flag is required (or the `NODE_ENV` environment variable must be
+  //     unset or set to `development`) because otherwise `npm ls` will not mention any packages
+  //     that are not included in `package.json` (which is expected to not exist).
+  const cmd = ['npm', 'ls', '--long', '--json', '--depth=0', '--no-production'];
+  const {dependencies = {}} = JSON.parse(await runCmd(cmd, {stdio: [null, 'string']}));
+  await Promise.all(Object.entries(dependencies).map(async ([pkg, info]) => {
+    if (!pkg.startsWith(exports.prefix)) {
+      delete dependencies[pkg];
+      return;
+    }
+    info.realPath = await fs.realpath(info.path);
+  }));
+  return dependencies;
+};
+
+const loadPlugin = async (packages, pluginName, plugins, parts) => {
+  const pluginPath = path.resolve(packages[pluginName].path, 'ep.json');
+  try {
+    const data = await fs.readFile(pluginPath);
+    try {
+      const plugin = JSON.parse(data);
+      plugin.package = packages[pluginName];
+      plugins[pluginName] = plugin;
+      for (const part of plugin.parts) {
+        part.plugin = pluginName;
+        part.full_name = `${pluginName}/${part.name}`;
+        parts[part.full_name] = part;
+      }
+    } catch (err) {
+      logger.error(`Unable to parse plugin definition file ${pluginPath}: ${err.stack || err}`);
+    }
+  } catch (err) {
+    logger.error(`Unable to load plugin definition file ${pluginPath}: ${err.stack || err}`);
+  }
+};
+
+const partsToParentChildList = (parts) => {
+  const res = [];
+  for (const name of Object.keys(parts)) {
+    for (const childName of parts[name].post || []) {
+      res.push([name, childName]);
+    }
+    for (const parentName of parts[name].pre || []) {
+      res.push([parentName, name]);
+    }
     if (!parts[name].pre && !parts[name].post) {
-      res.push([name, ":" + name]); // Include apps with no dependency info
+      res.push([name, `:${name}`]); // Include apps with no dependency info
     }
-  });
+  }
   return res;
-}
+};
 
 // Used only in Node, so no need for _
-function sortParts(parts) {
-  return tsort(
-    partsToParentChildList(parts)
-  ).filter(
-    function (name) { return parts[name] !== undefined; }
-  ).map(
-    function (name) { return parts[name]; }
-  );
-}
+const sortParts = (parts) => tsort(partsToParentChildList(parts))
+    .filter((name) => parts[name] !== undefined)
+    .map((name) => parts[name]);

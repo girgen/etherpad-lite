@@ -1,3 +1,5 @@
+// 'use strict';
+// Uncommenting above breaks tests.
 /**
  * 2014 John McLear (Etherpad Foundation / McLear Ltd)
  *
@@ -14,61 +16,87 @@
  * limitations under the License.
  */
 
-var log4js = require('log4js');
-var async = require("async");
-var db = require("../db/DB").db;
+const db = require('../db/DB');
+const hooks = require('../../static/js/pluginfw/hooks');
+const log4js = require('log4js');
+const supportedElems = require('../../static/js/contentcollector').supportedElems;
 
-exports.setPadRaw = function(padId, records, callback){
-  records = JSON.parse(records);
+const logger = log4js.getLogger('ImportEtherpad');
 
-  async.eachSeries(Object.keys(records), function(key, cb){
-    var value = records[key]
+exports.setPadRaw = (padId, r) => {
+  const records = JSON.parse(r);
 
-    if(!value){
-      return setImmediate(cb);
+  // get supported block Elements from plugins, we will use this later.
+  hooks.callAll('ccRegisterBlockElements').forEach((element) => {
+    supportedElems.add(element);
+  });
+
+  const unsupportedElements = new Set();
+
+  Object.keys(records).forEach(async (key) => {
+    let value = records[key];
+
+    if (!value) {
+      return;
     }
 
-    // Author data
-    if(value.padIDs){
-      // rewrite author pad ids
+    let newKey;
+
+    if (value.padIDs) {
+      // Author data - rewrite author pad ids
       value.padIDs[padId] = 1;
-      var newKey = key;
+      newKey = key;
 
       // Does this author already exist?
-      db.get(key, function(err, author){
-        if(author){
-          // Yes, add the padID to the author..
-          if( Object.prototype.toString.call(author) === '[object Array]'){
-            author.padIDs.push(padId);
-          }
-          value = author;
-        }else{
-          // No, create a new array with the author info in
-          value.padIDs = [padId];
+      const author = await db.get(key);
+
+      if (author) {
+        // Yes, add the padID to the author
+        if (Object.prototype.toString.call(author) === '[object Array]') {
+          author.padIDs.push(padId);
         }
-      });
 
-    // Not author data, probably pad data
-    }else{
-      // we can split it to look to see if its pad data
-      var oldPadId = key.split(":");
+        value = author;
+      } else {
+        // No, create a new array with the author info in
+        value.padIDs = [padId];
+      }
+    } else {
+      // Not author data, probably pad data
+      // we can split it to look to see if it's pad data
 
-      // we know its pad data..
-      if(oldPadId[0] === "pad"){
+      // is this an attribute we support or not?  If not, tell the admin
+      if (value.pool) {
+        for (const attrib of Object.keys(value.pool.numToAttrib)) {
+          const attribName = value.pool.numToAttrib[attrib][0];
+          if (!supportedElems.has(attribName)) unsupportedElements.add(attribName);
+        }
+      }
+      const oldPadId = key.split(':');
 
+      // we know it's pad data
+      if (oldPadId[0] === 'pad') {
         // so set the new pad id for the author
         oldPadId[1] = padId;
-        
+
         // and create the value
-        var newKey = oldPadId.join(":"); // create the new key
+        newKey = oldPadId.join(':'); // create the new key
       }
 
+      // is this a key that is supported through a plugin?
+      // get content that has a different prefix IE comments:padId:foo
+      // a plugin would return something likle ['comments', 'cakes']
+      for (const prefix of await hooks.aCallAll('exportEtherpadAdditionalContent')) {
+        if (prefix === oldPadId[0]) newKey = `${prefix}:${padId}`;
+      }
     }
-    // Write the value to the server
-    db.set(newKey, value);
 
-    setImmediate(cb);
-  }, function(){
-    callback(null, true);
+    // Write the value to the server
+    await db.set(newKey, value);
   });
-}
+
+  if (unsupportedElements.size) {
+    logger.warn('Ignoring unsupported elements (you might want to install a plugin): ' +
+                `${[...unsupportedElements].join(', ')}`);
+  }
+};

@@ -70,11 +70,11 @@ This creates an empty apool. An apool saves which attributes were used during th
 ```
 > apool.fromJsonable({"numToAttrib":{"0":["author","a.kVnWeomPADAT2pn9"],"1":["bold","true"],"2":["italic","true"]},"nextNum":3});
 > console.log(apool)
-{ numToAttrib: 
+{ numToAttrib:
    { '0': [ 'author', 'a.kVnWeomPADAT2pn9' ],
      '1': [ 'bold', 'true' ],
      '2': [ 'italic', 'true' ] },
-  attribToNum: 
+  attribToNum:
    { 'author,a.kVnWeomPADAT2pn9': 0,
      'bold,true': 1,
      'italic,true': 2 },
@@ -148,4 +148,9 @@ This is an atext. An atext has two parts: text and attribs. The text is just the
 
 The attribs are again a bunch of operators like .ops in the changeset was. But these operators are only + operators. They describe which part of the text has which attributes
 
-For more information see /doc/easysync/easysync-notes.txt in the source.
+## Resources / further reading
+
+Detailed information about the changesets & Easysync protocol:
+
+* Easysync Protocol - [/doc/easysync/easysync-notes.pdf](https://github.com/ether/etherpad-lite/blob/develop/doc/easysync/easysync-notes.pdf)
+* Etherpad and EasySync Technical Manual - [/doc/easysync/easysync-full-description.pdf](https://github.com/ether/etherpad-lite/blob/develop/doc/easysync/easysync-full-description.pdf)
