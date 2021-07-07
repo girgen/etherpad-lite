@@ -1,3 +1,91 @@
+# 1.8.4
+* FIX: fix a performance regression on MySQL introduced in 1.8.3
+* FIX: when running behind a reverse proxy and exposed in an inner directory, fonts and toolbar icons should now be visible. This is a regression introduced in 1.8.3
+* FIX: cleanups in the UI after the CSS rehaul of 1.8.3
+* MINOR: protect against bugged/stale UI elements after updates. An explicit cache busting via random query string is performed at each start. This needs to be replaced with hashed names in static assets.
+* MINOR: improved some tests
+* MINOR: fixed long-standing bugs in the maintenance tools in /bin (migrateDirtyDBtoRealDB, rebuildPad, convert, importSqlFile)
+
+# 1.8.3
+* FEATURE: colibris is now the default skin for new installs
+* FEATURE: improved colibris visuals, and migrated to Flexbox layout
+* FEATURE: skin variants: colibris skin colors can be easily customized. Visit http://127.0.0.1:9001/p/test#skinvariantsbuilder
+* REQUIREMENTS: minimum required Node version is **10.13.0 LTS**.
+* MINOR: stability fixes for the async migration in 1.8.0 (fixed many UnhandledPromiseRejectionWarning and the few remaining crashes)
+* MINOR: improved stability of import/export functionality
+* MINOR: fixed many small UI quirks (timeslider, import/export, chat)
+* MINOR: Docker images are now built & run in production mode by default
+* MINOR: reduced the size of the Docker images
+* MINOR: better documented cookies and configuration parameters of the Docker image
+* MINOR: better database support (especially MySQL)
+* MINOR: additional test coverage
+* MINOR: restored compatibility with ep_hash_auth
+* MINOR: migrate from swagger-node-express to openapi-backend
+* MINOR: honor the Accept-Language HTTP headers sent by browsers, eventually serving language variants
+* PERFORMANCE: correctly send HTTP/304 for minified files
+* SECURITY: bumped many dependencies. At the time of the release, this version has 0 reported vulnerabilities by npm audit
+* SECURITY: never send referrer when opening a link
+* SECURITY: rate limit imports and exports
+* SECURITY: do not allow pad import if a user never contributed to that pad
+* SECURITY: expose configuration parameter for limiting max import size
+
+*BREAKING CHANGE*: undoing the "clear authorship colors" command is no longer supported (see https://github.com/ether/etherpad-lite/issues/2802)
+*BREAKING CHANGE*: the visuals and CSS structure of the page was updated. Plugins may need a CSS rehaul
+
+# 1.8
+* SECURITY: change referrer policy so that Etherpad addresses aren't leaked when links are clicked (discussion: https://github.com/ether/etherpad-lite/pull/3636)
+* SECURITY: set the "secure" flag for the session cookies when served over SSL. From now on it will not be possible to serve the same instance both in cleartext and over SSL
+
+# 1.8-beta.1
+* FEATURE: code was migrated to `async`/`await`, getting rid of a lot of callbacks (see https://github.com/ether/etherpad-lite/issues/3540)
+* FEATURE: support configuration via environment variables
+* FEATURE: include an official Dockerfile in the main repository
+* FEATURE: support including plugins in custom Docker builds
+* FEATURE: conditional creation of users: when its password is null, a user is not created. This helps, for example, in advanced configuration of Docker images.
+* REQUIREMENTS: minimum required Node version is **8.9.0 LTS**. Release 1.8.3 will require at least Node **10.13.0** LTS
+* MINOR: in the HTTP API, allow URL parameters and POST bodies to co-exist
+* MINOR: fix Unicode bug in HTML export
+* MINOR: bugfixes to colibris chat window
+* MINOR: code simplification (avoided double negations, introduced early exits, ...)
+* MINOR: reduced the size of the Windows package
+* MINOR: upgraded the nodejs runtime to 10.16.3 in the Windows package
+* SECURITY: avoided XSS in IE11
+* SECURITY: the version is exposed in http header only when configured
+* SECURITY: updated vendored jQuery version
+* SECURITY: bumped dependencies
+
+# 1.7.5
+* FEATURE: introduced support for multiple skins. See https://etherpad.org/doc/v1.7.5/#index_skins
+* FEATURE: added a new, optional skin. It can be activated choosing `skinName: "colibris"` in `settings.json`
+* FEATURE: allow file import using LibreOffice
+* SECURITY: updated many dependencies. No known high or moderate risk dependencies remain.
+* SECURITY: generate better random pad names
+* FIX: don't nuke all installed plugins if `npm install` fails
+* FIX: improved LibreOffice export
+* FIX: allow debug mode on node versions >= 6.3
+* MINOR: started making Etherpad less dependent on current working directory when running
+* MINOR: started simplifying the code structure, flattening complex conditions
+* MINOR: simplified a bit the startup scripts
+
+*UPGRADE NOTES*: if you have custom files in `src/static/custom`, save them
+somewhere else, revert the directory contents, update to Etherpad 1.7.5, and
+finally put them back in their new location, uder `src/static/skins/no-skin`.
+
+# 1.7.0
+* FIX: `getLineHTMLForExport()` no longer produces multiple copies of a line. **WARNING**: this could potentially break some plugins
+* FIX: authorship of bullet points no longer changes when a second author edits them
+* FIX: improved Firefox compatibility (non printable keys)
+* FIX: `getPadPlainText()` was not working
+* REQUIREMENTS: minimum required Node version is 6.9.0 LTS. The next release will require at least Node 8.9.0 LTS
+* SECURITY: updated MySQL, Elasticsearch and PostgreSQL drivers
+* SECURITY: started updating deprecated code and packages
+* DOCS: documented --credentials, --apikey, --sessionkey. Better detailed contributors guidelines. Added a section on securing the installation
+
+# 1.6.6
+ * FIX: line numbers are aligned with text again (broken in 1.6.4)
+ * FIX: text entered between connection loss and reconnection was not saved
+ * FIX: diagnostic call failed when etherpad was exposed in a subdirectory
+
 # 1.6.5
  * SECURITY: Escape data when listing available plugins
  * FIX: Fix typo in apicalls.js which prevented importing isValidJSONPName
@@ -6,9 +94,9 @@
  * FIX: unbreak Safari iOS line wrapping
 
 # 1.6.4
- * SECURITY: exploitable /admin access - CVE-2018-9845
- * SECURITY: DoS with pad exports - CVE-2018-9327
- * SECURITY: Remote Code Execution - CVE-2018-9326
+ * SECURITY: Access Control bypass on /admin - CVE-2018-9845
+ * SECURITY: Remote Code Execution through pad export - CVE-2018-9327
+ * SECURITY: Remote Code Execution through JSONP handling - CVE-2018-9326
  * SECURITY: Pad data leak - CVE-2018-9325
  * Fix: Admin redirect URL
  * Fix: Various script Fixes
@@ -265,7 +353,7 @@
 # 1.3
  * NEW: We now follow the semantic versioning scheme!
  * NEW: Option to disable IP logging
- * NEW: Localisation updates from http://translatewiki.net.
+ * NEW: Localisation updates from https://translatewiki.net.
  * Fix: Fix readOnly group pads
  * Fix: don't fetch padList on every request
 
@@ -485,7 +573,7 @@
  * Plugin-specific settings in settings.json (finally allowing for things like a google analytics plugin)
  * Serve admin dashboard at /admin (still very limited, though)
  * Modify your settings.json through the newly created UI at /admin/settings
- * Fix: Import <ol>'s  as <ol>'s and not as <ul>'s!
+ * Fix: Import `<ol>` as `<ol>` and not as `<ul>`!
  * Added solaris compatibility (bin/installDeps.sh was broken on solaris)
  * Fix a bug with IE9 and Password Protected Pads using HTTPS
 

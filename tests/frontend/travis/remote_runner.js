@@ -12,14 +12,13 @@ var config = {
 var allTestsPassed = true;
 
 var sauceTestWorker = async.queue(function (testSettings, callback) {
-  var browser = wd.remote(config.host, config.port, config.username, config.accessKey);
-  var browserChain = browser.chain();
+  var browser = wd.promiseChainRemote(config.host, config.port, config.username, config.accessKey);
   var name = process.env.GIT_HASH + " - " + testSettings.browserName + " " + testSettings.version + ", " + testSettings.platform;
   testSettings.name = name;
   testSettings["public"] = true;
   testSettings["build"] = process.env.GIT_HASH;
 
-  browserChain.init(testSettings).get("http://localhost:9001/tests/frontend/", function(){
+  browser.init(testSettings).get("http://localhost:9001/tests/frontend/", function(){
     var url = "https://saucelabs.com/jobs/" + browser.sessionID;
     console.log("Remote sauce test '" + name + "' started! " + url);
 
@@ -28,7 +27,7 @@ var sauceTestWorker = async.queue(function (testSettings, callback) {
       getStatusInterval && clearInterval(getStatusInterval);
       clearTimeout(timeout);
 
-      browserChain.quit();
+      browser.quit();
 
       if(!success){
         allTestsPassed = false;
@@ -39,7 +38,7 @@ var sauceTestWorker = async.queue(function (testSettings, callback) {
       testResult = testResult.split("\\n").map(function(line){
         return "[" + testSettings.browserName + (testSettings.version === "" ? '' : (" " + testSettings.version)) + "] " + line;
       }).join("\n");
-      
+
       console.log(testResult);
       console.log("Remote sauce test '" + name + "' finished! " + url);
 
@@ -53,7 +52,7 @@ var sauceTestWorker = async.queue(function (testSettings, callback) {
 
     var knownConsoleText = "";
     var getStatusInterval = setInterval(function(){
-      browserChain.eval("$('#console').text()", function(err, consoleText){
+      browser.eval("$('#console').text()", function(err, consoleText){
         if(!consoleText || err){
           return;
         }
@@ -68,41 +67,39 @@ var sauceTestWorker = async.queue(function (testSettings, callback) {
   });
 }, 5); //run 5 tests in parrallel
 
-// Firefox 
+// 1) Firefox on Linux
 sauceTestWorker.push({
     'platform'       : 'Linux'
   , 'browserName'    : 'firefox'
-  , 'version'        : ''
+  , 'version'        : 'latest'
 });
 
-// Chrome
+// 2) Chrome on Linux
 sauceTestWorker.push({
     'platform'       : 'Linux'
   , 'browserName'    : 'googlechrome'
-  , 'version'        : ''
+  , 'version'        : 'latest'
 });
 
-/*
-// IE 8
+// 3) Safari on OSX 10.15
 sauceTestWorker.push({
-    'platform'       : 'Windows 2003'
-  , 'browserName'    : 'iexplore'
-  , 'version'        : '8'
-});
-*/
-
-// IE 9
-sauceTestWorker.push({
-    'platform'       : 'Windows XP'
-  , 'browserName'    : 'iexplore'
-  , 'version'        : '9'
+    'platform'       : 'OS X 10.15'
+  , 'browserName'    : 'safari'
+  , 'version'        : 'latest'
 });
 
-// IE 10
+// 4) IE 10 on Win 8
 sauceTestWorker.push({
-    'platform'       : 'Windows 2012'
+    'platform'       : 'Windows 8'
   , 'browserName'    : 'iexplore'
-  , 'version'        : '10'
+  , 'version'        : '10.0'
+});
+
+// 5) Edge on Win 10
+sauceTestWorker.push({
+    'platform'       : 'Windows 10'
+  , 'browserName'    : 'microsoftedge'
+  , 'version'        : 'latest'
 });
 
 sauceTestWorker.drain = function() {
