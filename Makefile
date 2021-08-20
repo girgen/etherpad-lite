@@ -44,6 +44,6 @@ pingpong:
 	printf done > src/.ep_initialized
 	printf 'nmwh8EiZwdqrKldw7bM72Wh5AUnHNqUR' > APIKEY.txt
 	printf '575cdbe2ee99477d066291fbbd5d66257ef433258c9cf7362b785573767841f6' > SESSIONKEY.txt
-	touch settings.json
-	tar cf - *KEY.txt doc node_modules settings.json* src tests var \
+	cp -p settings.json.template settings.json
+	tar cf - *KEY.txt doc node_modules settings.json* credentials.json.template src tests var \
 		| xz -9 > etherpad-`echo ${VERSION} | tr -d ' '`.tar.xz
