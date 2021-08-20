@@ -33,9 +33,7 @@ clean:
 
 pingpong:
 	bin/installDeps.sh
-	npm install ep_disable_change_author_name
-	npm install ep_historicalsearch
-	npm install ep_page_view
+	npm install --no-save --legacy-peer-deps ep_disable_change_author_name ep_comments_page ep_who_did_what
 	rsync -a pingpong_overwrite/ ./
 	cd src/node_modules/languages4translatewiki ;\
 		sed -i '' 's,svenska,Svenska,g' *js *json ;\

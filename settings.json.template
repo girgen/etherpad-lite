@@ -196,15 +196,10 @@
    * https://www.npmjs.com/package/ueberdb2
    */
 
-  //the database specific settings
-  "dbSettings" : {
-                    "user"    : "nobody", 
-                    "host"    : "@dbserver@", 
-                    "port"    : "@dbport@", 
-                    "password": "", 
-                    "database": "@dbname@",
-                    "ssl"     : "true"
-                  },
+  "dbType": "dirty",
+    "dbSettings": {
+    "filename": "var/dirty.db"
+  },
 
    /*
    * An Example of MySQL Configuration (commented out).
@@ -487,6 +482,7 @@
       "is_admin": false
     }
   },
+
 
   /*
    * Restrict socket.io transport methods
