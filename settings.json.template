@@ -196,14 +196,9 @@
    * https://www.npmjs.com/package/ueberdb2
    */
 
-  "dbType" : "postgres",
-  "dbSettings" : {
-    "user"    : "nobody", 
-    "host"    : "@dbserver@", 
-    "port"    : "@dbport@", 
-    "password": "", 
-    "database": "@dbname@",
-    "ssl"     : "true"
+  "dbType": "dirty",
+    "dbSettings": {
+    "filename": "var/dirty.db"
   },
 
   /*
