@@ -36,7 +36,7 @@ pingpong:
 	npm install --no-save --legacy-peer-deps ep_disable_change_author_name ep_comments_page ep_who_did_what
 	rsync -a pingpong_overwrite/ ./
 	cd src/node_modules/languages4translatewiki ;\
-       		sed -i '' 's,svenska,Svenska,g' *js *json ;\
+		sed -i '' 's,svenska,Svenska,g' *js *json ;\
 		gzip -c -9 languages.json > language.json.gz ;\
 		gzip -c -9 languages.min.js > languages.min.js.gz
 	ls src/locales | grep -v sv.json | grep -v en.json | xargs rm
