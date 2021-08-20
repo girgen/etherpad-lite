@@ -1,103 +1,127 @@
-var plugins = require("ep_etherpad-lite/static/js/pluginfw/plugins");
-var hooks = require("ep_etherpad-lite/static/js/pluginfw/hooks");
-var npm = require("npm");
-var request = require("request");
+'use strict';
 
-var npmIsLoaded = false;
-var withNpm = function (npmfn) {
-  if(npmIsLoaded) return npmfn();
-  npm.load({}, function (er) {
-    if (er) return npmfn(er);
-    npmIsLoaded = true;
-    npm.on("log", function (message) {
-      console.log('npm: ',message)
-    });
-    npmfn();
-  });
-}
+const log4js = require('log4js');
+const plugins = require('./plugins');
+const hooks = require('./hooks');
+const request = require('request');
+const runCmd = require('../../../node/utils/run_cmd');
+const settings = require('../../../node/utils/Settings');
 
-var tasks = 0
-function wrapTaskCb(cb) {
-  tasks++
-  return function() {
-    cb && cb.apply(this, arguments);
-    tasks--;
-    if(tasks == 0) onAllTasksFinished();
-  }
-}
-function onAllTasksFinished() {
-  hooks.aCallAll("restartServer", {}, function () {});
-}
+const logger = log4js.getLogger('plugins');
 
-exports.uninstall = function(plugin_name, cb) {
-  cb = wrapTaskCb(cb);
-  withNpm(function (er) {
-    if (er) return cb && cb(er);
-    npm.commands.uninstall([plugin_name], function (er) {
-      if (er) return cb && cb(er);
-      hooks.aCallAll("pluginUninstall", {plugin_name: plugin_name}, function (er, data) {
-        if (er) return cb(er);
-        plugins.update(cb);
-      });
-    });
-  });
+const onAllTasksFinished = async () => {
+  settings.reloadSettings();
+  await hooks.aCallAll('loadSettings', {settings});
+  await hooks.aCallAll('restartServer');
 };
 
-exports.install = function(plugin_name, cb) {
-  cb = wrapTaskCb(cb)
-  withNpm(function (er) {
-    if (er) return cb && cb(er);
-    npm.commands.install([plugin_name], function (er) {
-      if (er) return cb && cb(er);
-      hooks.aCallAll("pluginInstall", {plugin_name: plugin_name}, function (er, data) {
-        if (er) return cb(er);
-        plugins.update(cb);
-      });
-    });
-  });
+let tasks = 0;
+
+const wrapTaskCb = (cb) => {
+  tasks++;
+
+  return (...args) => {
+    cb && cb(...args);
+    tasks--;
+    if (tasks === 0) onAllTasksFinished();
+  };
+};
+
+exports.uninstall = async (pluginName, cb = null) => {
+  cb = wrapTaskCb(cb);
+  logger.info(`Uninstalling plugin ${pluginName}...`);
+  try {
+    // The --no-save flag prevents npm from creating package.json or package-lock.json.
+    // The --legacy-peer-deps flag is required to work around a bug in npm v7:
+    // https://github.com/npm/cli/issues/2199
+    await runCmd(['npm', 'uninstall', '--no-save', '--legacy-peer-deps', pluginName]);
+  } catch (err) {
+    logger.error(`Failed to uninstall plugin ${pluginName}`);
+    cb(err || new Error(err));
+    throw err;
+  }
+  logger.info(`Successfully uninstalled plugin ${pluginName}`);
+  await hooks.aCallAll('pluginUninstall', {pluginName});
+  await plugins.update();
+  cb(null);
+};
+
+exports.install = async (pluginName, cb = null) => {
+  cb = wrapTaskCb(cb);
+  logger.info(`Installing plugin ${pluginName}...`);
+  try {
+    // The --no-save flag prevents npm from creating package.json or package-lock.json.
+    // The --legacy-peer-deps flag is required to work around a bug in npm v7:
+    // https://github.com/npm/cli/issues/2199
+    await runCmd(['npm', 'install', '--no-save', '--legacy-peer-deps', pluginName]);
+  } catch (err) {
+    logger.error(`Failed to install plugin ${pluginName}`);
+    cb(err || new Error(err));
+    throw err;
+  }
+  logger.info(`Successfully installed plugin ${pluginName}`);
+  await hooks.aCallAll('pluginInstall', {pluginName});
+  await plugins.update();
+  cb(null);
 };
 
 exports.availablePlugins = null;
-var cacheTimestamp = 0;
+let cacheTimestamp = 0;
 
-exports.getAvailablePlugins = function(maxCacheAge, cb) {
-  request("https://static.etherpad.org/plugins.json", function(er, response, plugins){
-    if (er) return cb && cb(er);
-    if(exports.availablePlugins && maxCacheAge && Math.round(+new Date/1000)-cacheTimestamp <= maxCacheAge) {
-      return cb && cb(null, exports.availablePlugins)
+exports.getAvailablePlugins = (maxCacheAge) => {
+  const nowTimestamp = Math.round(Date.now() / 1000);
+
+  return new Promise((resolve, reject) => {
+    // check cache age before making any request
+    if (exports.availablePlugins && maxCacheAge && (nowTimestamp - cacheTimestamp) <= maxCacheAge) {
+      return resolve(exports.availablePlugins);
     }
-    try {
-      plugins = JSON.parse(plugins);
-    } catch (err) {
-      console.error('error parsing plugins.json:', err);
-      plugins = [];
-    }
-    exports.availablePlugins = plugins;
-    cacheTimestamp = Math.round(+new Date/1000);
-    cb && cb(null, plugins)
+
+    request('https://static.etherpad.org/plugins.json', (er, response, plugins) => {
+      if (er) return reject(er);
+
+      try {
+        plugins = JSON.parse(plugins);
+      } catch (err) {
+        logger.error(`error parsing plugins.json: ${err.stack || err}`);
+        plugins = [];
+      }
+
+      exports.availablePlugins = plugins;
+      cacheTimestamp = nowTimestamp;
+      resolve(plugins);
+    });
   });
 };
 
 
-exports.search = function(searchTerm, maxCacheAge, cb) {
-  exports.getAvailablePlugins(maxCacheAge, function(er, results) {
-    if(er) return cb && cb(er);
-    var res = {};
-    if (searchTerm)
-      searchTerm = searchTerm.toLowerCase();
-    for (var pluginName in results) { // for every available plugin
-      if (pluginName.indexOf(plugins.prefix) != 0) continue; // TODO: Also search in keywords here!
+exports.search = (searchTerm, maxCacheAge) => exports.getAvailablePlugins(maxCacheAge).then(
+    (results) => {
+      const res = {};
 
-      if(searchTerm && !~results[pluginName].name.toLowerCase().indexOf(searchTerm)
-         && (typeof results[pluginName].description != "undefined" && !~results[pluginName].description.toLowerCase().indexOf(searchTerm) )
-           ){
-           if(typeof results[pluginName].description === "undefined"){
-             console.debug('plugin without Description: %s', results[pluginName].name);
-           }
-           continue;
+      if (searchTerm) {
+        searchTerm = searchTerm.toLowerCase();
       }
-      res[pluginName] = results[pluginName];
+
+      for (const pluginName in results) {
+        // for every available plugin
+        // TODO: Also search in keywords here!
+        if (pluginName.indexOf(plugins.prefix) !== 0) continue;
+
+        if (searchTerm && !~results[pluginName].name.toLowerCase().indexOf(searchTerm) &&
+           (typeof results[pluginName].description !== 'undefined' &&
+              !~results[pluginName].description.toLowerCase().indexOf(searchTerm))
+        ) {
+          if (typeof results[pluginName].description === 'undefined') {
+            logger.debug(`plugin without Description: ${results[pluginName].name}`);
+          }
+
+          continue;
+        }
+
+        res[pluginName] = results[pluginName];
+      }
+
+      return res;
     }
-    cb && cb(null, res)
-  })
-};
+);

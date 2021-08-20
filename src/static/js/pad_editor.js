@@ -1,3 +1,4 @@
+'use strict';
 /**
  * This code is mostly from the old Etherpad. Please help us to comment this code.
  * This helps other people to understand this code better and helps them to improve it.
@@ -20,210 +21,193 @@
  * limitations under the License.
  */
 
-var padcookie = require('./pad_cookie').padcookie;
-var padutils = require('./pad_utils').padutils;
+const Cookies = require('./pad_utils').Cookies;
+const padcookie = require('./pad_cookie').padcookie;
+const padutils = require('./pad_utils').padutils;
 
-var padeditor = (function()
-{
-  var Ace2Editor = undefined;
-  var pad = undefined;
-  var settings = undefined;
+const padeditor = (() => {
+  let Ace2Editor = undefined;
+  let pad = undefined;
+  let settings = undefined;
 
-  // Array of available fonts
-
-  var fonts = ['useMonospaceFont', 'useMontserratFont', 'useOpenDyslexicFont', 'useComicSansFont', 'useCourierNewFont',
-    'useGeorgiaFont', 'useImpactFont', 'useLucidaFont', 'useLucidaSansFont', 'usePalatinoFont', 'useRobotoMonoFont',
-    'useTahomaFont', 'useTimesNewRomanFont', 'useTrebuchetFont', 'useVerdanaFont', 'useSymbolFont', 'useWebdingsFont',
-    'useWingDingsFont', 'useSansSerifFont', 'useSerifFont'];
-
-
-  var self = {
+  const self = {
     ace: null,
     // this is accessed directly from other files
     viewZoom: 100,
-    init: function(readyFunc, initialViewOptions, _pad)
-    {
+    init: async (initialViewOptions, _pad) => {
       Ace2Editor = require('./ace').Ace2Editor;
       pad = _pad;
       settings = pad.settings;
-
-      function aceReady()
-      {
-        $("#editorloadingbox").hide();
-        if (readyFunc)
-        {
-          readyFunc();
-        }
-      }
-
       self.ace = new Ace2Editor();
-      self.ace.init("editorcontainer", "", aceReady);
-      self.ace.setProperty("wraps", true);
-      if (pad.getIsDebugEnabled())
-      {
-        self.ace.setProperty("dmesg", pad.dmesg);
+      await self.ace.init('editorcontainer', '');
+      $('#editorloadingbox').hide();
+      // Listen for clicks on sidediv items
+      const $outerdoc = $('iframe[name="ace_outer"]').contents().find('#outerdocbody');
+      $outerdoc.find('#sidedivinner').on('click', 'div', function () {
+        const targetLineNumber = $(this).index() + 1;
+        window.location.hash = `L${targetLineNumber}`;
+      });
+      exports.focusOnLine(self.ace);
+      self.ace.setProperty('wraps', true);
+      if (pad.getIsDebugEnabled()) {
+        self.ace.setProperty('dmesg', pad.dmesg);
       }
       self.initViewOptions();
       self.setViewOptions(initialViewOptions);
-
       // view bar
-      $("#viewbarcontents").show();
+      $('#viewbarcontents').show();
     },
-    initViewOptions: function()
-    {
+    initViewOptions: () => {
       // Line numbers
-      padutils.bindCheckboxChange($("#options-linenoscheck"), function()
-      {
-        pad.changeViewOption('showLineNumbers', padutils.getCheckbox($("#options-linenoscheck")));
+      padutils.bindCheckboxChange($('#options-linenoscheck'), () => {
+        pad.changeViewOption('showLineNumbers', padutils.getCheckbox($('#options-linenoscheck')));
       });
 
       // Author colors
-      padutils.bindCheckboxChange($("#options-colorscheck"), function()
-      {
-        padcookie.setPref('showAuthorshipColors', padutils.getCheckbox("#options-colorscheck"));
-        pad.changeViewOption('showAuthorColors', padutils.getCheckbox("#options-colorscheck"));
+      padutils.bindCheckboxChange($('#options-colorscheck'), () => {
+        padcookie.setPref('showAuthorshipColors', padutils.getCheckbox('#options-colorscheck'));
+        pad.changeViewOption('showAuthorColors', padutils.getCheckbox('#options-colorscheck'));
       });
 
       // Right to left
-      padutils.bindCheckboxChange($("#options-rtlcheck"), function()
-      {
-        pad.changeViewOption('rtlIsTrue', padutils.getCheckbox($("#options-rtlcheck")))
+      padutils.bindCheckboxChange($('#options-rtlcheck'), () => {
+        pad.changeViewOption('rtlIsTrue', padutils.getCheckbox($('#options-rtlcheck')));
       });
-      html10n.bind('localized', function() {
-        pad.changeViewOption('rtlIsTrue', ('rtl' == html10n.getDirection()));
-        padutils.setCheckbox($("#options-rtlcheck"), ('rtl' == html10n.getDirection()));
-      })
+      html10n.bind('localized', () => {
+        pad.changeViewOption('rtlIsTrue', ('rtl' === html10n.getDirection()));
+        padutils.setCheckbox($('#options-rtlcheck'), ('rtl' === html10n.getDirection()));
+      });
 
       // font family change
-      $("#viewfontmenu").change(function()
-      {
-        $.each(fonts, function(i, font){
-          var sfont = font.replace("use","");
-          sfont = sfont.replace("Font","");
-          sfont = sfont.toLowerCase();
-          pad.changeViewOption(font, $("#viewfontmenu").val() == sfont);
-        });
+      $('#viewfontmenu').change(() => {
+        pad.changeViewOption('padFontFamily', $('#viewfontmenu').val());
       });
 
       // Language
-      html10n.bind('localized', function() {
-        $("#languagemenu").val(html10n.getLanguage());
+      html10n.bind('localized', () => {
+        $('#languagemenu').val(html10n.getLanguage());
         // translate the value of 'unnamed' and 'Enter your name' textboxes in the userlist
-        // this does not interfere with html10n's normal value-setting because html10n just ingores <input>s
-        // also, a value which has been set by the user will be not overwritten since a user-edited <input>
-        // does *not* have the editempty-class
-        $('input[data-l10n-id]').each(function(key, input){
+
+        // this does not interfere with html10n's normal value-setting because
+        // html10n just ingores <input>s
+        // also, a value which has been set by the user will be not overwritten
+        // since a user-edited <input> does *not* have the editempty-class
+        $('input[data-l10n-id]').each((key, input) => {
           input = $(input);
-          if(input.hasClass("editempty")){
-            input.val(html10n.get(input.attr("data-l10n-id")));
+          if (input.hasClass('editempty')) {
+            input.val(html10n.get(input.attr('data-l10n-id')));
           }
         });
-      })
-      $("#languagemenu").val(html10n.getLanguage());
-      $("#languagemenu").change(function() {
-        pad.createCookie("language",$("#languagemenu").val(),null,'/');
-        window.html10n.localize([$("#languagemenu").val(), 'en']);
       });
-    },
-    setViewOptions: function(newOptions)
-    {
-      function getOption(key, defaultValue)
-      {
-        var value = String(newOptions[key]);
-        if (value == "true") return true;
-        if (value == "false") return false;
-        return defaultValue;
-      }
-
-      var v;
-
-      v = getOption('rtlIsTrue', ('rtl' == html10n.getDirection()));
-      self.ace.setProperty("rtlIsTrue", v);
-      padutils.setCheckbox($("#options-rtlcheck"), v);
-
-      v = getOption('showLineNumbers', true);
-      self.ace.setProperty("showslinenumbers", v);
-      padutils.setCheckbox($("#options-linenoscheck"), v);
-
-      v = getOption('showAuthorColors', true);
-      self.ace.setProperty("showsauthorcolors", v);
-      padutils.setCheckbox($("#options-colorscheck"), v);
-
-      // Override from parameters if true
-      if (settings.noColors !== false){
-        self.ace.setProperty("showsauthorcolors", !settings.noColors);
-      }
-
-      var normalFont = true;
-      // Go through each font and see if the option is set..
-      $.each(fonts, function(i, font){
-        var isEnabled = getOption(font, false);
-        if(isEnabled){
-          font = font.replace("use","");
-          font = font.replace("Font","");
-          font = font.toLowerCase();
-          if(font === "monospace") self.ace.setProperty("textface", "monospace");
-          if(font === "montserrat") self.ace.setProperty("textface", "Montserrat");
-          if(font === "opendyslexic") self.ace.setProperty("textface", "OpenDyslexic");
-          if(font === "comicsans") self.ace.setProperty("textface", "'Comic Sans MS','Comic Sans',cursive");
-          if(font === "georgia") self.ace.setProperty("textface", "Georgia,'Bitstream Charter',serif");
-          if(font === "impact") self.ace.setProperty("textface", "Impact,Haettenschweiler,'Arial Black',sans-serif");
-          if(font === "lucida") self.ace.setProperty("textface", "Lucida,'Lucida Serif','Lucida Bright',serif");
-          if(font === "lucidasans") self.ace.setProperty("textface", "'Lucida Sans','Lucida Grande','Lucida Sans Unicode','Luxi Sans',sans-serif");
-          if(font === "palatino") self.ace.setProperty("textface", "Palatino,'Palatino Linotype','URW Palladio L',Georgia,serif");
-          if(font === "robotomono") self.ace.setProperty("textface", "RobotoMono");
-          if(font === "tahoma") self.ace.setProperty("textface", "Tahoma,sans-serif");
-          if(font === "timesnewroman") self.ace.setProperty("textface", "'Times New Roman',Times,serif");
-          if(font === "trebuchet") self.ace.setProperty("textface", "'Trebuchet MS',sans-serif");
-          if(font === "verdana") self.ace.setProperty("textface", "Verdana,'DejaVu Sans',sans-serif");
-          if(font === "symbol") self.ace.setProperty("textface", "Symbol");
-          if(font === "webdings") self.ace.setProperty("textface", "Webdings");
-          if(font === "wingdings") self.ace.setProperty("textface", "Wingdings");
-          if(font === "sansserif") self.ace.setProperty("textface", "sans-serif");
-          if(font === "serif") self.ace.setProperty("textface", "serif");
-
-          // $("#viewfontmenu").val(font);
-          normalFont = false;
+      $('#languagemenu').val(html10n.getLanguage());
+      $('#languagemenu').change(() => {
+        Cookies.set('language', $('#languagemenu').val());
+        window.html10n.localize([$('#languagemenu').val(), 'en']);
+        if ($('select').niceSelect) {
+          $('select').niceSelect('update');
         }
       });
+    },
+    setViewOptions: (newOptions) => {
+      const getOption = (key, defaultValue) => {
+        const value = String(newOptions[key]);
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return defaultValue;
+      };
 
-      // No font has been previously selected so use the Normal font
-      if(normalFont){
-        self.ace.setProperty("textface", "'Helvetica Neue',Arial, sans-serif");
-        // $("#viewfontmenu").val("normal");
+      let v;
+
+      v = getOption('rtlIsTrue', ('rtl' === html10n.getDirection()));
+      self.ace.setProperty('rtlIsTrue', v);
+      padutils.setCheckbox($('#options-rtlcheck'), v);
+
+      v = getOption('showLineNumbers', true);
+      self.ace.setProperty('showslinenumbers', v);
+      padutils.setCheckbox($('#options-linenoscheck'), v);
+
+      v = getOption('showAuthorColors', true);
+      self.ace.setProperty('showsauthorcolors', v);
+      $('#chattext').toggleClass('authorColors', v);
+      $('iframe[name="ace_outer"]').contents().find('#sidedivinner').toggleClass('authorColors', v);
+      padutils.setCheckbox($('#options-colorscheck'), v);
+
+      // Override from parameters if true
+      if (settings.noColors !== false) {
+        self.ace.setProperty('showsauthorcolors', !settings.noColors);
       }
 
+      self.ace.setProperty('textface', newOptions.padFontFamily || '');
     },
-    dispose: function()
-    {
-      if (self.ace)
-      {
+    dispose: () => {
+      if (self.ace) {
         self.ace.destroy();
         self.ace = null;
       }
     },
-    enable: function()
-    {
-      if (self.ace)
-      {
+    enable: () => {
+      if (self.ace) {
         self.ace.setEditable(true);
       }
     },
-    disable: function()
-    {
-      if (self.ace)
-      {
-        self.ace.setProperty("grayedOut", true);
+    disable: () => {
+      if (self.ace) {
         self.ace.setEditable(false);
       }
     },
-    restoreRevisionText: function(dataFromServer)
-    {
+    restoreRevisionText: (dataFromServer) => {
       pad.addHistoricalAuthors(dataFromServer.historicalAuthorData);
       self.ace.importAText(dataFromServer.atext, dataFromServer.apool, true);
-    }
+    },
   };
   return self;
-}());
+})();
 
 exports.padeditor = padeditor;
+
+exports.focusOnLine = (ace) => {
+  // If a number is in the URI IE #L124 go to that line number
+  const lineNumber = window.location.hash.substr(1);
+  if (lineNumber) {
+    if (lineNumber[0] === 'L') {
+      const $outerdoc = $('iframe[name="ace_outer"]').contents().find('#outerdocbody');
+      const lineNumberInt = parseInt(lineNumber.substr(1));
+      if (lineNumberInt) {
+        const $inner = $('iframe[name="ace_outer"]').contents().find('iframe')
+            .contents().find('#innerdocbody');
+        const line = $inner.find(`div:nth-child(${lineNumberInt})`);
+        if (line.length !== 0) {
+          let offsetTop = line.offset().top;
+          offsetTop += parseInt($outerdoc.css('padding-top').replace('px', ''));
+          const hasMobileLayout = $('body').hasClass('mobile-layout');
+          if (!hasMobileLayout) {
+            offsetTop += parseInt($inner.css('padding-top').replace('px', ''));
+          }
+          const $outerdocHTML = $('iframe[name="ace_outer"]').contents()
+              .find('#outerdocbody').parent();
+          $outerdoc.css({top: `${offsetTop}px`}); // Chrome
+          $outerdocHTML.animate({scrollTop: offsetTop}); // needed for FF
+          const node = line[0];
+          ace.callWithAce((ace) => {
+            const selection = {
+              startPoint: {
+                index: 0,
+                focusAtStart: true,
+                maxIndex: 1,
+                node,
+              },
+              endPoint: {
+                index: 0,
+                focusAtStart: true,
+                maxIndex: 1,
+                node,
+              },
+            };
+            ace.ace_setSelection(selection);
+          });
+        }
+      }
+    }
+  }
+  // End of setSelection / set Y position of editor
+};

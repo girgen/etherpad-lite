@@ -6,7 +6,14 @@ docassets = $(addprefix out/,$(wildcard doc/assets/*))
 VERSION = $(shell node -e "console.log( require('./src/package.json').version )")
 UNAME := $(shell uname -s)
 
-docs: $(outdoc_files) $(docassets)
+ensure_marked_is_installed:
+	set -eu; \
+	hash npm; \
+	if [ $(shell npm list --prefix src/bin/doc >/dev/null 2>/dev/null; echo $$?) -ne "0" ]; then \
+		npm ci --prefix=src/bin/doc; \
+	fi
+
+docs: ensure_marked_is_installed $(outdoc_files) $(docassets)
 
 out/doc/assets/%: doc/assets/%
 	mkdir -p $(@D)
@@ -14,8 +21,12 @@ out/doc/assets/%: doc/assets/%
 
 out/doc/%.html: doc/%.md
 	mkdir -p $(@D)
-	node bin/doc/generate.js --format=html --template=doc/template.html $< > $@
-	sed -i"" -e 's/__VERSION__/${VERSION}/' $@
+	node src/bin/doc/generate.js --format=html --template=doc/template.html $< > $@
+ifeq ($(UNAME),Linux)
+	sed -i 's/__VERSION__/${VERSION}/' $@
+else
+	sed -i '' 's/__VERSION__/${VERSION}/' $@
+endif
 
 clean:
 	rm -rf out/
@@ -27,7 +38,7 @@ pingpong:
 	npm install ep_page_view
 	rsync -a pingpong_overwrite/ ./
 	cd src/node_modules/languages4translatewiki ;\
-       		sed -i '' 's,svenska,Svenska,g' *js *json ;\
+		sed -i '' 's,svenska,Svenska,g' *js *json ;\
 		gzip -c -9 languages.json > language.json.gz ;\
 		gzip -c -9 languages.min.js > languages.min.js.gz
 	ls src/locales | grep -v sv.json | grep -v en.json | xargs rm
