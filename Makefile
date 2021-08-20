@@ -39,7 +39,7 @@ pingpong:
 		sed -i '' 's,svenska,Svenska,g' *js *json ;\
 		gzip -c -9 languages.json > language.json.gz ;\
 		gzip -c -9 languages.min.js > languages.min.js.gz
-	ls src/locales | grep -v sv.json | grep -v en.json | xargs rm
+	cd src/locales && ls | grep -v sv.json | grep -v en.json | xargs rm
 	printf done > node_modules/ep_disable_change_author_name/.ep_initialized
 	printf done > src/.ep_initialized
 	printf 'nmwh8EiZwdqrKldw7bM72Wh5AUnHNqUR' > APIKEY.txt
