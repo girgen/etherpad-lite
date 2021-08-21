@@ -146,9 +146,9 @@
   "timeslider.version": "Version {{version}}",
   "timeslider.saved": "Saved {{month}} {{day}}, {{year}}",
 
-  "timeslider.playPause": "Playback / Pause Pad Contents",
-  "timeslider.backRevision":"Go back a revision in this Pad",
-  "timeslider.forwardRevision":"Go forward a revision in this Pad",
+  "timeslider.playPause": "Playback / Pause Document Contents",
+  "timeslider.backRevision":"Go back a revision in this Document",
+  "timeslider.forwardRevision":"Go forward a revision in this Document",
 
   "timeslider.dateformat": "{{month}}/{{day}}/{{year}} {{hours}}:{{minutes}}:{{seconds}}",
   "timeslider.month.january": "January",
@@ -175,7 +175,7 @@
   "pad.impexp.importing": "Importing...",
   "pad.impexp.confirmimport": "Importing a file will overwrite the current text of the document. Are you sure you want to proceed?",
   "pad.impexp.convertFailed": "We were not able to import this file. Please use a different document format or copy paste manually",
-  "pad.impexp.padHasData": "We were not able to import this file because this Pad has already had changes, please import to a new document",
+  "pad.impexp.padHasData": "We were not able to import this file because this Document has already had changes, please import to a new document",
   "pad.impexp.uploadFailed": "The upload failed, please try again",
   "pad.impexp.importfailed": "Import failed",
   "pad.impexp.copypaste": "Please copy paste",
