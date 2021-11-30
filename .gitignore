@@ -9,7 +9,6 @@ var/dirty.db
 *.patch
 npm-debug.log
 *.DS_Store
-.ep_initialized
 *.crt
 *.key
 bin/etherpad-1.deb
