@@ -23,7 +23,7 @@
     {
       "name": "static",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/static"
+        "expressPreSession": "ep_etherpad-lite/node/hooks/express/static"
       }
     },
     {
@@ -35,14 +35,22 @@
     {
       "name": "i18n",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/i18n"
+        "expressPreSession": "ep_etherpad-lite/node/hooks/i18n"
       }
     },
     {
       "name": "specialpages",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/specialpages"
+        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/specialpages",
+        "expressPreSession": "ep_etherpad-lite/node/hooks/express/specialpages",
+        "socketio": "ep_etherpad-lite/node/hooks/express/specialpages"
       }
+    },
+    {
+      "name": "oauth2",
+        "hooks": {
+            "expressCreateServer": "ep_etherpad-lite/node/security/OAuth2Provider"
+        }
     },
     {
       "name": "padurlsanitize",
@@ -51,15 +59,15 @@
       }
     },
     {
-      "name": "webaccess",
+      "name": "pwa",
       "hooks": {
-        "expressConfigure": "ep_etherpad-lite/node/hooks/express/webaccess"
+        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/pwa"
       }
     },
     {
       "name": "apicalls",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/apicalls"
+        "expressPreSession": "ep_etherpad-lite/node/hooks/express/apicalls"
       }
     },
     {
@@ -85,7 +93,7 @@
     {
       "name": "tests",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/tests"
+        "expressPreSession": "ep_etherpad-lite/node/hooks/express/tests"
       }
     },
     {
@@ -97,21 +105,19 @@
     {
       "name": "adminplugins",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/adminplugins",
         "socketio": "ep_etherpad-lite/node/hooks/express/adminplugins"
       }
     },
     {
       "name": "adminsettings",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/adminsettings",
         "socketio": "ep_etherpad-lite/node/hooks/express/adminsettings"
       }
     },
     {
       "name": "openapi",
       "hooks": {
-        "expressCreateServer": "ep_etherpad-lite/node/hooks/express/openapi"
+        "expressPreSession": "ep_etherpad-lite/node/hooks/express/openapi"
       }
     }
   ]

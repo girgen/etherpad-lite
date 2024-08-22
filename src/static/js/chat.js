@@ -21,9 +21,11 @@ const padcookie = require('./pad_cookie').padcookie;
 const Tinycon = require('tinycon/tinycon');
 const hooks = require('./pluginfw/hooks');
 const padeditor = require('./pad_editor').padeditor;
+import html10n from './vendors/html10n';
 
 // Removes diacritics and lower-cases letters. https://stackoverflow.com/a/37511463
 const normalize = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 
 exports.chat = (() => {
   let isStuck = false;
@@ -42,11 +44,14 @@ exports.chat = (() => {
     },
     focus: () => {
       setTimeout(() => {
-        $('#chatinput').focus();
+        $('#chatinput').trigger('focus');
       }, 100);
     },
     // Make chat stick to right hand side of screen
     stickToScreen(fromInitialCall) {
+      if ($('#options-stickychat').prop('checked')) {
+        $('#options-stickychat').prop('checked', false);
+      }
       if (pad.settings.hideChat) {
         return;
       }
@@ -68,7 +73,7 @@ exports.chat = (() => {
         this.stickToScreen(true);
         $('#options-stickychat').prop('checked', true);
         $('#options-chatandusers').prop('checked', true);
-        $('#options-stickychat').prop('disabled', 'disabled');
+        $('#options-stickychat').prop('disabled', true);
         userAndChat = true;
       } else {
         $('#options-stickychat').prop('disabled', false);
@@ -223,14 +228,14 @@ exports.chat = (() => {
         // Send the users focus back to the pad
         if ((evt.altKey === true && evt.which === 67) || evt.which === 27) {
           // If we're in chat already..
-          $(':focus').blur(); // required to do not try to remove!
+          $(':focus').trigger('blur'); // required to do not try to remove!
           padeditor.ace.focus(); // Sends focus back to pad
           evt.preventDefault();
           return false;
         }
       });
       // Clear the chat mentions when the user clicks on the chat input box
-      $('#chatinput').click(() => {
+      $('#chatinput').on('click', () => {
         chatMentions = 0;
         Tinycon.setBubble(0);
       });
@@ -239,14 +244,14 @@ exports.chat = (() => {
       $('body:not(#chatinput)').on('keypress', function (evt) {
         if (evt.altKey && evt.which === 67) {
           // Alt c focuses on the Chat window
-          $(this).blur();
+          $(this).trigger('blur');
           self.show();
-          $('#chatinput').focus();
+          $('#chatinput').trigger('focus');
           evt.preventDefault();
         }
       });
 
-      $('#chatinput').keypress((evt) => {
+      $('#chatinput').on('keypress', (evt) => {
         // if the user typed enter, fire the send
         if (evt.key === 'Enter' && !evt.shiftKey) {
           evt.preventDefault();
@@ -257,7 +262,7 @@ exports.chat = (() => {
       // initial messages are loaded in pad.js' _afterHandshake
 
       $('#chatcounter').text(0);
-      $('#chatloadmessagesbutton').click(() => {
+      $('#chatloadmessagesbutton').on('click', () => {
         const start = Math.max(this.historyPointer - 20, 0);
         const end = this.historyPointer;
 

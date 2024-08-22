@@ -4,8 +4,34 @@
 #
 # Author: muxator
 
-FROM node:14-buster-slim
+FROM node:alpine AS adminbuild
+RUN npm install -g pnpm@9.0.4
+WORKDIR /opt/etherpad-lite
+COPY . .
+RUN pnpm install
+RUN pnpm run build:ui
+
+
+FROM node:alpine AS build
 LABEL maintainer="Etherpad team, https://github.com/ether/etherpad-lite"
+
+# Set these arguments when building the image from behind a proxy
+ARG http_proxy=
+ARG https_proxy=
+ARG no_proxy=
+
+ARG TIMEZONE=
+
+RUN \
+  [ -z "${TIMEZONE}" ] || { \
+    apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/${TIMEZONE} /etc/localtime && \
+    echo "${TIMEZONE}" > /etc/timezone; \
+  }
+ENV TIMEZONE=${TIMEZONE}
+
+# Control the configuration file to be copied into the container.
+ARG SETTINGS=./settings.json.docker
 
 # plugins to install while building the container. By default no plugins are
 # installed.
@@ -14,6 +40,14 @@ LABEL maintainer="Etherpad team, https://github.com/ether/etherpad-lite"
 # EXAMPLE:
 #   ETHERPAD_PLUGINS="ep_codepad ep_author_neat"
 ARG ETHERPAD_PLUGINS=
+
+# local plugins to install while building the container. By default no plugins are
+# installed.
+# If given a value, it has to be a space-separated, quoted list of plugin names.
+#
+# EXAMPLE:
+#   ETHERPAD_LOCAL_PLUGINS="../ep_my_plugin ../ep_another_plugin"
+ARG ETHERPAD_LOCAL_PLUGINS=
 
 # Control whether abiword will be installed, enabling exports to DOC/PDF/ODT formats.
 # By default, it is not installed.
@@ -31,11 +65,8 @@ ARG INSTALL_ABIWORD=
 #   INSTALL_LIBREOFFICE=true
 ARG INSTALL_SOFFICE=
 
-# By default, Etherpad container is built and run in "production" mode. This is
-# leaner (development dependencies are not installed) and runs faster (among
-# other things, assets are minified & compressed).
-ENV NODE_ENV=production
-
+# Install dependencies required for modifying access.
+RUN apk add --no-cache shadow bash
 # Follow the principle of least privilege: run as unprivileged user.
 #
 # Running as non-root enables running this image in platforms like OpenShift
@@ -47,6 +78,7 @@ ARG EP_HOME=
 ARG EP_UID=5001
 ARG EP_GID=0
 ARG EP_SHELL=
+
 RUN groupadd --system ${EP_GID:+--gid "${EP_GID}" --non-unique} etherpad && \
     useradd --system ${EP_UID:+--uid "${EP_UID}" --non-unique} --gid etherpad \
         ${EP_HOME:+--home-dir "${EP_HOME}"} --create-home \
@@ -57,45 +89,67 @@ RUN mkdir -p "${EP_DIR}" && chown etherpad:etherpad "${EP_DIR}"
 
 # the mkdir is needed for configuration of openjdk-11-jre-headless, see
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199
-RUN export DEBIAN_FRONTEND=noninteractive; \
+RUN  \
     mkdir -p /usr/share/man/man1 && \
-    apt-get -qq update && \
-    apt-get -qq --no-install-recommends install \
+    npm install pnpm@9.0.4 -g  && \
+    apk update && apk upgrade && \
+    apk add --no-cache \
         ca-certificates \
-        git \
         curl \
-        ${INSTALL_ABIWORD:+abiword} \
-        ${INSTALL_SOFFICE:+libreoffice} \
-        && \
-    apt-get -qq clean && \
-    rm -rf /var/lib/apt/lists/*
+        git \
+        ${INSTALL_ABIWORD:+abiword abiword-plugin-command} \
+        ${INSTALL_SOFFICE:+libreoffice openjdk8-jre libreoffice-common}
 
 USER etherpad
 
 WORKDIR "${EP_DIR}"
 
-COPY --chown=etherpad:etherpad ./ ./
+# etherpads version feature requires this. Only copy what is really needed
+COPY --chown=etherpad:etherpad ./.git/HEA[D] ./.git/HEAD
+COPY --chown=etherpad:etherpad ./.git/ref[s] ./.git/refs
+COPY --chown=etherpad:etherpad ${SETTINGS} ./settings.json
+COPY --chown=etherpad:etherpad ./var ./var
+COPY --chown=etherpad:etherpad ./bin ./bin
+COPY --chown=etherpad:etherpad ./pnpm-workspace.yaml ./package.json ./
 
-# Plugins must be installed before installing Etherpad's dependencies, otherwise
-# npm will try to hoist common dependencies by removing them from
-# src/node_modules and installing them in the top-level node_modules. As of
-# v6.14.10, npm's hoist logic appears to be buggy, because it sometimes removes
-# dependencies from src/node_modules but fails to add them to the top-level
-# node_modules. Even if npm correctly hoists the dependencies, the hoisting
-# seems to confuse tools such as `npm outdated`, `npm update`, and some ESLint
-# rules.
-RUN { [ -z "${ETHERPAD_PLUGINS}" ] || \
-      npm install --no-save ${ETHERPAD_PLUGINS}; } && \
-    src/bin/installDeps.sh && \
-    rm -rf ~/.npm
+FROM build AS development
+
+COPY --chown=etherpad:etherpad ./src/package.json .npmrc ./src/
+COPY --chown=etherpad:etherpad --from=adminbuild /opt/etherpad-lite/src/ templates/admin./src/templates/admin
+COPY --chown=etherpad:etherpad --from=adminbuild /opt/etherpad-lite/src/static/oidc ./src/static/oidc
+
+RUN bin/installDeps.sh && \
+    if [ ! -z "${ETHERPAD_PLUGINS}" ] || [ ! -z "${ETHERPAD_LOCAL_PLUGINS}" ]; then \
+        pnpm run plugins i ${ETHERPAD_PLUGINS} ${ETHERPAD_LOCAL_PLUGINS:+--path ${ETHERPAD_LOCAL_PLUGINS}}; \
+    fi
+
+
+FROM build AS production
+
+ENV NODE_ENV=production
+ENV ETHERPAD_PRODUCTION=true
+
+COPY --chown=etherpad:etherpad ./src ./src
+COPY --chown=etherpad:etherpad --from=adminbuild /opt/etherpad-lite/src/templates/admin ./src/templates/admin
+COPY --chown=etherpad:etherpad --from=adminbuild /opt/etherpad-lite/src/static/oidc ./src/static/oidc
+
+RUN bin/installDeps.sh && rm -rf ~/.npm && rm -rf ~/.local && rm -rf ~/.cache && \
+    if [ ! -z "${ETHERPAD_PLUGINS}" ] || [ ! -z "${ETHERPAD_LOCAL_PLUGINS}" ]; then \
+        pnpm run plugins i ${ETHERPAD_PLUGINS} ${ETHERPAD_LOCAL_PLUGINS:+--path ${ETHERPAD_LOCAL_PLUGINS}}; \
+    fi
+
 
 # Copy the configuration file.
-COPY --chown=etherpad:etherpad ./settings.json.docker "${EP_DIR}"/settings.json
+COPY --chown=etherpad:etherpad ${SETTINGS} "${EP_DIR}"/settings.json
 
 # Fix group permissions
-RUN chmod -R g=u .
+# Note: For some reason increases image size from 257 to 334.
+# RUN chmod -R g=u .
 
-HEALTHCHECK --interval=20s --timeout=3s CMD curl -f http://localhost:9001 || exit 1
+USER etherpad
+
+HEALTHCHECK --interval=5s --timeout=3s \
+  CMD curl --silent http://localhost:9001/health | grep -E "pass|ok|up" > /dev/null || exit 1
 
 EXPOSE 9001
-CMD ["node", "src/node/server.js"]
+CMD ["pnpm", "run", "prod"]

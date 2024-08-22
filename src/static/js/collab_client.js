@@ -66,7 +66,7 @@ const getCollabClient = (ace2editor, serverVars, initialUserInfo, options, _pad)
   if (browser.firefox) {
     // Prevent "escape" from taking effect and canceling a comet connection;
     // doesn't work if focus is on an iframe.
-    $(window).bind('keydown', (evt) => {
+    $(window).on('keydown', (evt) => {
       if (evt.which === 27) {
         evt.preventDefault();
       }
@@ -156,7 +156,7 @@ const getCollabClient = (ace2editor, serverVars, initialUserInfo, options, _pad)
   };
 
   const sendMessage = (msg) => {
-    getSocket().json.send(
+    getSocket().emit('message',
         {
           type: 'COLLABROOM',
           component: 'pad',
@@ -207,8 +207,11 @@ const getCollabClient = (ace2editor, serverVars, initialUserInfo, options, _pad)
       });
     } else if (msg.type === 'ACCEPT_COMMIT') {
       serverMessageTaskQueue.enqueue(() => {
-        const newRev = msg.newRev;
-        if (newRev !== (rev + 1)) {
+        const {newRev} = msg;
+        // newRev will equal rev if the changeset has no net effect (identity changeset, removing
+        // and re-adding the same characters with the same attributes, or retransmission of an
+        // already applied changeset).
+        if (![rev, rev + 1].includes(newRev)) {
           window.console.warn(`bad message revision on ACCEPT_COMMIT: ${newRev} not ${rev + 1}`);
           // setChannelState("DISCONNECTED", "badmessage_acceptcommit");
           return;

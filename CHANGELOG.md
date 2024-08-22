@@ -1,3 +1,340 @@
+# 2.2.2
+
+### Notable enhancements and fixes
+
+- Removal of Etherpad require kernel: We finally managed to include esbuild to bundle our frontend code together. So no matter how many plugins your server has it is always one JavaScript file. This boosts performance dramatically.
+- Added log layoutType: This lets you print the log in either colored or basic (black and white text)
+- Introduced esbuild for bundling CSS files
+- Cache all files to be bundled in memory for faster load speed
+
+
+# 2.1.1
+
+
+### Notable enhancements and fixes
+
+- Fixed failing Docker build when checked out as git submodule. Thanks to @neurolabs
+- Fixed: Fallback to websocket and polling when unknown(old) config is present for socket io
+- Fixed: Next page disabled if zero page by @samyakj023
+- On CTRL+CLICK bring the window back to focus by Helder Sepulveda
+
+# 2.1.0
+
+### Notable enhancements and fixes
+
+- Added PWA support. You can now add your Etherpad instance to your home screen on your mobile device or desktop.
+- Fixed live plugin manager versions clashing. Thanks to @yacchin1205
+- Fixed a bug in the pad panel where pagination was not working correctly when sorting by pad name
+
+### Compatibility changes
+
+- Reintroduced APIKey.txt support. You can now switch between APIKey and OAuth2.0 authentication. This can be toggled with the setting authenticationMethod. The default is OAuth2. If you want to use the APIKey method you can set that to `apikey`.
+
+
+# 2.0.3
+
+### Notable enhancements and fixes
+
+- Added documentation for replacing apikeys with oauth2
+- Bumped live plugin manager to 0.20.0. Thanks to @fgreinacher
+- Added better documentation for using docker-compose with Etherpad
+
+
+
+# 2.0.2
+
+### Notable enhancements and fixes
+
+- Fixed the locale loading in the admin panel
+- Added OAuth2.0 support for the Etherpad API. You can now log in  into the Etherpad API with your admin user using OAuth2
+
+### Compatibility changes
+
+- The tests now require generating a token from the OAuth secret. You can find the `generateJWTToken` in the common.ts script for plugin endpoint updates.
+
+
+# 2.0.1
+
+### Notable enhancements and fixes
+
+- Fixed a bug where a plugin depending on a scoped dependency would not install successfully.
+
+
+# 2.0.0
+
+
+### Compatibility changes
+
+- Socket io has been updated to 4.7.5. This means that the json.send function won't work anymore and needs to be changed to .emit('message', myObj)
+- Deprecating npm version 6 in favor of pnpm: We have made the decision to switch to the well established pnpm (https://pnpm.io/). It works by symlinking dependencies into a global directory allowing you to have a cleaner and more reliable environment.
+- Introducing Typescript to the Etherpad core: Etherpad core logic has been rewritten in Typescript allowing for compiler checking of errors.
+- Rewritten Admin Panel: The Admin panel has been rewritten in React and now features a more pleasant user experience. It now also features an integrated pad searching with sorting functionality.
+
+### Notable enhancements and fixes
+
+* Bugfixes
+  - Live Plugin Manager: The live plugin manager caused problems when a plugin had depdendencies defined. This issue is now resolved.
+
+* Enhancements
+  - pnpm Workspaces: In addition to pnpm we introduced workspaces. A clean way to manage multiple bounded contexts like the admin panel or the bin folder.
+  - Bin folder: The bin folder has been moved from the src folder to the root folder. This change was necessary as the contained scripts do not represent core functionality of the user.
+  - Starting Etherpad: Etherpad can now be started with a single command: `pnpm run prod` in the root directory.
+  - Installing Etherpad: Etherpad no longer symlinks itself in the root directory. This is now also taken care by pnpm, and it just creates a node_modules folder with the src directory`s ep_etherpad-lite folder
+  - Plugins can now be installed simply via the command: `pnpm run plugins i first-plugin second-plugin` or if you want to install from path you can do:
+  `pnpm run plugins i --path ../path-to-plugin`
+
+
+# 1.9.7
+
+### Notable enhancements and fixes
+
+* Added Live Plugin Manager: Plugins are now installed into a separate folder on the host system. This folder is called `plugin_packages`.
+That way the plugins are separated from the normal etherpad installation.
+* Make repairPad.js more verbose
+* Fixed favicon not being loaded correctly
+
+# 1.9.6
+
+### Notable enhancements and fixes
+
+* Prevent etherpad crash when update server is not reachable
+* Use npm@6 in Docker build
+* Fix setting the log level in settings.json
+
+
+# 1.9.5
+
+### Compatibility changes
+
+* This version deprecates NodeJS16 as it reached its end of life and won't receive any updates. So to get started with Etherpad v1.9.5 you need NodeJS 18 and above.
+* The bundled windows NodeJS version has been bumped to the current LTS version 20.
+
+### Notable enhancements and fixes
+
+* The support for the tidy program to tidy up HTML files has been removed. This decision was made because it hasn't been updated for years and also caused an incompability when exporting a pad with Abiword.
+
+
+# 1.9.4
+
+### Compatibility changes
+
+* Log4js has been updated to the latest version. As it involved a bump of 6 major version.
+  A lot has changed since then. Most notably the console appender has been deprecated. You can find out more about it [here](https://github.com/log4js-node/log4js-node)
+
+### Notable enhancements and fixes
+
+* Fix for MySQL: The logger calls were incorrectly configured leading to a crash when e.g. somebody uses a different encoding than standard MySQL encoding.
+
+# 1.9.3
+
+### Compability changes
+
+* express-rate-limit has been bumped to 7.0.0: This involves the breaking change that "max: 0"
+in the importExportRateLimiting is set to always trigger. So set it to your desired value.
+If you haven't changed that value in the settings.json you are all set.
+
+### Notable enhancements and fixes
+
+* Bugfixes
+  * Fix etherpad crashing with mongodb database
+
+* Enhancements
+  * Add surrealdb database support. You can find out more about this database [here](https://surrealdb.com).
+  * Make sqlite faster: The sqlite library has been switched to better-sqlite3. This should lead to better performance.
+
+# 1.9.2
+
+### Notable enhancements and fixes
+
+* Security
+  * Enable session key rotation: This setting can be enabled in the settings.json. It changes the signing key for the cookie authentication in a fixed interval.
+
+* Bugfixes
+  * Fix appendRevision when creating a new pad via the API without a text.
+
+
+* Enhancements
+  * Bump JQuery to version 3.7
+  * Update elasticsearch connector to version 8
+
+### Compatibility changes
+
+* No compability changes as JQuery maintains excellent backwards compatibility.
+
+#### For plugin authors
+
+* Please update to JQuery 3.7. There is an excellent deprecation guide over [here](https://api.jquery.com/category/deprecated/). Version 3.1 to 3.7 are relevant for the upgrade.
+
+# 1.9.1
+
+### Notable enhancements and fixes
+
+* Security
+  * Limit requested revisions in timeslider and export to head revision. (affects v1.9.0)
+
+* Bugfixes
+  * revisions in `CHANGESET_REQ` (timeslider) and export (txt, html, custom)
+    are now checked to be numbers.
+  * bump sql for audit fix
+* Enhancements
+  * Add keybinding meta-backspace to delete to beginning of line
+  * Fix automatic Windows build via GitHub Actions
+  * Enable docs to be build cross platform thanks to asciidoctor
+
+### Compatibility changes
+* tests: drop windows 7 test coverage & use chrome latest for admin tests
+* Require Node 16 for Etherpad and target Node 20 for testing
+
+
+# 1.9.0
+
+### Notable enhancements and fixes
+
+* Windows build:
+  * The bundled `node.exe` was upgraded from v12 to v16.
+  * The bundled `node.exe` is now a 64-bit executable. If you need the 32-bit
+    version you must download and install Node.js yourself.
+* Improvements to login session management:
+  * `express_sid` cookies and `sessionstorage:*` database records are no longer
+    created unless `requireAuthentication` is `true` (or a plugin causes them to
+    be created).
+  * Login sessions now have a finite lifetime by default (10 days after
+    leaving).
+  * `sessionstorage:*` database records are automatically deleted when the login
+    session expires (with some exceptions that will be fixed in the future).
+  * Requests for static content (e.g., `/robots.txt`) and special pages (e.g.,
+    the HTTP API, `/stats`) no longer create login session state.
+  * The secret used to sign the `express_sid` cookie is now automatically
+    regenerated every day (called *key rotation*) by default. If key rotation is
+    enabled, the now-deprecated `SESSIONKEY.txt` file can be safely deleted
+    after Etherpad starts up (its content is read and saved to the database and
+    used to validate signatures from old cookies until they expire).
+* The following settings from `settings.json` are now applied as expected (they
+  were unintentionally ignored before):
+  * `padOptions.lang`
+  * `padOptions.showChat`
+  * `padOptions.userColor`
+  * `padOptions.userName`
+* HTTP API:
+  * Fixed the return value of `getText` when called with a specific revision.
+  * Fixed a potential attribute pool corruption bug with
+    `copyPadWithoutHistory`.
+  * Mappings created by `createGroupIfNotExistsFor` are now removed from the
+    database when the group is deleted.
+  * Fixed race conditions in the `setText`, `appendText`, and `restoreRevision`
+    functions.
+  * Added an optional `authorId` parameter to `appendText`,
+    `copyPadWithoutHistory`, `createGroupPad`, `createPad`, `restoreRevision`,
+    `setHTML`, and `setText`, and bumped the latest API version to 1.3.0.
+* Fixed a crash if the database is busy enough to cause a query timeout.
+* New `/health` endpoint for getting information about Etherpad's health (see
+  [draft-inadarei-api-health-check-06](https://www.ietf.org/archive/id/draft-inadarei-api-health-check-06.html)).
+* Docker now uses the new `/health` endpoint for health checks, which avoids
+  issues when authentication is enabled. It also avoids the unnecessary creation
+  of database records for managing browser sessions.
+* When copying a pad, the pad's records are copied in batches to avoid database
+  timeouts with large pads.
+* Exporting a large pad to `.etherpad` format should be faster thanks to bulk
+  database record fetches.
+* When importing an `.etherpad` file, records are now saved to the database in
+  batches to avoid database timeouts with large pads.
+
+#### For plugin authors
+
+* New `expressPreSession` server-side hook.
+* Pad server-side hook changes:
+  * `padCheck`: New hook.
+  * `padCopy`: New `srcPad` and `dstPad` context properties.
+  * `padDefaultContent`: New hook.
+  * `padRemove`: New `pad` context property.
+* The `db` property on Pad objects is now public.
+* New `getAuthorId` server-side hook.
+* New APIs for processing attributes: `ep_etherpad-lite/static/js/attributes`
+  (low-level API) and `ep_etherpad-lite/static/js/AttributeMap` (high-level
+  API).
+* The `import` server-side hook has a new `ImportError` context property.
+* New `exportEtherpad` and `importEtherpad` server-side hooks.
+* The `handleMessageSecurity` and `handleMessage` server-side hooks have a new
+  `sessionInfo` context property that includes the user's author ID, the pad ID,
+  and whether the user only has read-only access.
+* The `handleMessageSecurity` server-side hook can now be used to grant write
+  access for the current message only.
+* The `init_<pluginName>` server-side hooks have a new `logger` context
+  property that plugins can use to log messages.
+* Prevent infinite loop when exiting the server
+* Bump dependencies
+
+
+### Compatibility changes
+
+* Node.js v14.15.0 or later is now required.
+* The default login session expiration (applicable if `requireAuthentication` is
+  `true`) changed from never to 10 days after the user leaves.
+
+#### For plugin authors
+
+* The `client` context property for the `handleMessageSecurity` and
+  `handleMessage` server-side hooks is deprecated; use the `socket` context
+  property instead.
+* Pad server-side hook changes:
+  * `padCopy`:
+    * The `originalPad` context property is deprecated; use `srcPad` instead.
+    * The `destinationID` context property is deprecated; use `dstPad.id`
+      instead.
+  * `padCreate`: The `author` context property is deprecated; use the new
+    `authorId` context property instead. Also, the hook now runs asynchronously.
+  * `padLoad`: Now runs when a temporary Pad object is created during import.
+    Also, it now runs asynchronously.
+  * `padRemove`: The `padID` context property is deprecated; use `pad.id`
+    instead.
+  * `padUpdate`: The `author` context property is deprecated; use the new
+    `authorId` context property instead. Also, the hook now runs asynchronously.
+* Returning `true` from a `handleMessageSecurity` hook function is deprecated;
+  return `'permitOnce'` instead.
+* Changes to the `src/static/js/Changeset.js` library:
+  * The following attribute processing functions are deprecated (use the new
+    attribute APIs instead):
+    * `attribsAttributeValue()`
+    * `eachAttribNumber()`
+    * `makeAttribsString()`
+    * `opAttributeValue()`
+  * `opIterator()`: Deprecated in favor of the new `deserializeOps()` generator
+    function.
+  * `appendATextToAssembler()`: Deprecated in favor of the new `opsFromAText()`
+    generator function.
+  * `newOp()`: Deprecated in favor of the new `Op` class.
+* The `AuthorManager.getAuthor4Token()` function is deprecated; use the new
+  `AuthorManager.getAuthorId()` function instead.
+* The exported database records covered by the `exportEtherpadAdditionalContent`
+  server-side hook now include keys like `${customPrefix}:${padId}:*`, not just
+  `${customPrefix}:${padId}`.
+* Plugin locales should overwrite core's locales Stale
+* Plugin locales overwrite core locales
+
+# 1.8.18
+
+Released: 2022-05-05
+
+### Notable enhancements and fixes
+
+  * Upgraded ueberDB to fix a regression with CouchDB.
+
+# 1.8.17
+
+Released: 2022-02-23
+
+### Security fixes
+
+* Fixed a vunlerability in the `CHANGESET_REQ` message handler that allowed a
+  user with any access to read any pad if the pad ID is known.
+
+### Notable enhancements and fixes
+
+* Fixed a bug that caused all pad edit messages received at the server to go
+  through a single queue. Now there is a separate queue per pad as intended,
+  which should reduce message processing latency when many pads are active at
+  the same time.
+
 # 1.8.16
 
 ### Security fixes

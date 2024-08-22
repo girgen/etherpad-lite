@@ -7,6 +7,7 @@
 // Licensed under the terms of the GNU General Public License v2.0:
 // https://github.com/mattfarina/farbtastic/blob/71ca15f4a09c8e5a08a1b0d1cf37ef028adf22f0/LICENSE.txt
 // edited by Sebastian Castro <sebastian.castro@protonmail.com> on 2020-04-06
+
 (function ($) {
 
 var __debug = false;
@@ -33,7 +34,7 @@ $._farbtastic = function (container, options) {
   fb.linkTo = function (callback) {
     // Unbind previous nodes
     if (typeof fb.callback == 'object') {
-      $(fb.callback).unbind('keyup', fb.updateValue);
+      $(fb.callback).off('keyup').on('keyup', fb.updateValue);
     }
 
     // Reset color
@@ -45,7 +46,7 @@ $._farbtastic = function (container, options) {
     }
     else if (typeof callback == 'object' || typeof callback == 'string') {
       fb.callback = $(callback);
-      fb.callback.bind('keyup', fb.updateValue);
+      fb.callback.on('keyup', fb.updateValue);
       if (fb.callback[0].value) {
         fb.setColor(fb.callback[0].value);
       }
@@ -172,7 +173,7 @@ $._farbtastic = function (container, options) {
           angle2 = d2 * Math.PI * 2,
           // Endpoints
           x1 = Math.sin(angle1), y1 = -Math.cos(angle1);
-          x2 = Math.sin(angle2), y2 = -Math.cos(angle2),
+          let x2 = Math.sin(angle2), y2 = -Math.cos(angle2),
           // Midpoint chosen so that the endpoints are tangent to the circle.
           am = (angle1 + angle2) / 2,
           tan = 1 / Math.cos((angle2 - angle1) / 2),
@@ -329,8 +330,8 @@ $._farbtastic = function (container, options) {
 
     // Update the overlay canvas.
     fb.ctxOverlay.clearRect(-fb.mid, -fb.mid, sz, sz);
-    for (i in circles) {
-      var c = circles[i];
+    for (let i in circles) {
+      const c = circles[i];
       fb.ctxOverlay.lineWidth = c.lw;
       fb.ctxOverlay.strokeStyle = c.c;
       fb.ctxOverlay.beginPath();
@@ -388,7 +389,7 @@ $._farbtastic = function (container, options) {
   fb.mousedown = function (event) {
     // Capture mouse
     if (!$._farbtastic.dragging) {
-      $(document).bind('mousemove', fb.mousemove).bind('mouseup', fb.mouseup);
+      $(document).on('mousemove', fb.mousemove).on('mouseup', fb.mouseup);
       $._farbtastic.dragging = true;
     }
 
@@ -429,8 +430,8 @@ $._farbtastic = function (container, options) {
    */
   fb.mouseup = function () {
     // Uncapture mouse
-    $(document).unbind('mousemove', fb.mousemove);
-    $(document).unbind('mouseup', fb.mouseup);
+    $(document).off('mousemove', fb.mousemove);
+    $(document).off('mouseup',  fb.mouseup);
     $._farbtastic.dragging = false;
   }
 
@@ -519,7 +520,7 @@ $._farbtastic = function (container, options) {
   fb.initWidget();
 
   // Install mousedown handler (the others are set on the document on-demand)
-  $('canvas.farbtastic-overlay', container).mousedown(fb.mousedown);
+  $('canvas.farbtastic-overlay', container).on('mousedown',fb.mousedown);
 
   // Set linked elements/callback
   if (options.callback) {

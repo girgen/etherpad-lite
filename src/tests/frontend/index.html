@@ -14,7 +14,6 @@
       <div id="iframe-container"></div>
     </div>
 
-    <script src="../../static/js/require-kernel.js"></script>
     <script src="../../static/js/vendors/jquery.js"></script>
     <script src="lib/sendkeys.js"></script>
     <script src="../../static/js/vendors/browser.js"></script>
@@ -22,7 +21,7 @@
     <script src="lib/underscore.js"></script>
 
     <script src="lib/mocha.js"></script>
-    <script> mocha.setup({ui: 'bdd', checkLeaks: true, timeout: 60000}) </script>
+    <script> mocha.setup({ui: 'bdd', checkLeaks: true, globals: 'ret_nodes', timeout: 60000}) </script>
     <script src="lib/expect.js"></script>
 
     <script src="helper.js"></script>

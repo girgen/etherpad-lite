@@ -1,4 +1,5 @@
 'use strict';
+import html10n from './vendors/html10n';
 
 exports.showCountDownTimerToReconnectOnModal = ($modal, pad) => {
   if (clientVars.automaticReconnectionTimeout && $modal.is('.with_reconnect_timer')) {
@@ -96,7 +97,7 @@ const whenConnectionIsRestablishedWithServer = (callback, pad) => {
 };
 
 const forceReconnection = ($modal) => {
-  $modal.find('#forcereconnect').click();
+  $modal.find('#forcereconnect').trigger('click');
 };
 
 const updateCountDownTimerMessage = ($modal, minutes, seconds) => {

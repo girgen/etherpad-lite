@@ -1,10 +1,12 @@
+/etherpad-win.exe
+/etherpad-win.zip
 node_modules
 /settings.json
 !settings.json.template
 APIKEY.txt
 SESSIONKEY.txt
-etherpad-lite-win.zip
 var/dirty.db
+.env
 *~
 *.patch
 npm-debug.log
@@ -23,3 +25,9 @@ out/
 /src/bin/convertSettings.json
 /src/bin/etherpad-1.deb
 /src/bin/node.exe
+plugin_packages
+/src/templates/admin
+/src/test-results
+playwright-report
+state.json
+/src/static/oidc

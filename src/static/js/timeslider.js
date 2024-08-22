@@ -31,7 +31,7 @@ const randomString = require('./pad_utils').randomString;
 const hooks = require('./pluginfw/hooks');
 const padutils = require('./pad_utils').padutils;
 const socketio = require('./socketio');
-
+import html10n from '../js/vendors/html10n'
 let token, padId, exportLinks, socket, changesetLoader, BroadcastSlider;
 
 const init = () => {
@@ -82,7 +82,7 @@ const init = () => {
     // get all the export links
     exportLinks = $('#export > .exportlink');
 
-    $('button#forcereconnect').click(() => {
+    $('button#forcereconnect').on('click', () => {
       window.location.reload();
     });
 
@@ -95,7 +95,7 @@ const init = () => {
 
 // sends a message over the socket
 const sendSocketMsg = (type, data) => {
-  socket.json.send({
+  socket.emit("message", {
     component: 'pad', // FIXME: Remove this stupidity!
     type,
     data,
@@ -110,6 +110,20 @@ const fireWhenAllScriptsAreLoaded = [];
 const handleClientVars = (message) => {
   // save the client Vars
   window.clientVars = message.data;
+
+  if (window.clientVars.sessionRefreshInterval) {
+    const ping =
+        () => $.ajax('../../_extendExpressSessionLifetime', {method: 'PUT'}).catch(() => {});
+    setInterval(ping, window.clientVars.sessionRefreshInterval);
+  }
+
+  if(window.clientVars.mode === "development") {
+    console.warn('Enabling development mode with live update')
+    socket.on('liveupdate', ()=>{
+      console.log('Doing live reload')
+      location.reload()
+    })
+  }
 
   // load all script that doesn't work without the clientVars
   BroadcastSlider = require('./broadcast_slider')
@@ -153,7 +167,7 @@ const handleClientVars = (message) => {
   $('#rightstep').attr('title', html10n.get('timeslider.forwardRevision'));
 
   // font family change
-  $('#viewfontmenu').change(function () {
+  $('#viewfontmenu').on('change', function () {
     $('#innerdocbody').css('font-family', $(this).val() || '');
   });
 };

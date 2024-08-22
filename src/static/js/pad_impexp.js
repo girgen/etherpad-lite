@@ -22,6 +22,9 @@
  * limitations under the License.
  */
 
+import html10n from './vendors/html10n';
+
+
 const padimpexp = (() => {
   let pad;
 
@@ -38,7 +41,7 @@ const padimpexp = (() => {
   const fileInputUpdated = () => {
     $('#importsubmitinput').addClass('throbbold');
     $('#importformfilediv').addClass('importformenabled');
-    $('#importsubmitinput').removeAttr('disabled');
+    $('#importsubmitinput').prop('disabled', false);
     $('#importmessagefail').fadeOut('fast');
   };
 
@@ -69,8 +72,8 @@ const padimpexp = (() => {
         $('#import_export').removeClass('popup-show');
         if (directDatabaseAccess) window.location.reload();
       }
-      $('#importsubmitinput').removeAttr('disabled').val(html10n.get('pad.impexp.importbutton'));
-      window.setTimeout(() => $('#importfileinput').removeAttr('disabled'), 0);
+      $('#importsubmitinput').prop('disabled', false).val(html10n.get('pad.impexp.importbutton'));
+      window.setTimeout(() => $('#importfileinput').prop('disabled', false), 0);
       $('#importstatusball').hide();
       addImportFrames();
     })();
@@ -162,9 +165,9 @@ const padimpexp = (() => {
       }
 
       addImportFrames();
-      $('#importfileinput').change(fileInputUpdated);
-      $('#importform').unbind('submit').submit(fileInputSubmit);
-      $('.disabledexport').click(cantExport);
+      $('#importfileinput').on('change', fileInputUpdated);
+      $('#importform').off('submit').on('submit', fileInputSubmit);
+      $('.disabledexport').on('click', cantExport);
     },
     disable: () => {
       $('#impexp-disabled-clickcatcher').show();

@@ -4,7 +4,7 @@ Most of these hooks are called during or in order to set up the formatting
 process.
 
 ## documentReady
-Called from: src/templates/pad.html
+Called from: `src/templates/pad.html`
 
 Things in context:
 
@@ -14,7 +14,7 @@ This hook proxies the functionality of jQuery's `$(document).ready` event.
 
 ## aceDomLinePreProcessLineAttributes
 
-Called from: src/static/js/domline.js
+Called from: `src/static/js/domline.js`
 
 Things in context:
 
@@ -36,7 +36,7 @@ more.
 
 ## aceDomLineProcessLineAttributes
 
-Called from: src/static/js/domline.js
+Called from: `src/static/js/domline.js`
 
 Things in context:
 
@@ -58,7 +58,7 @@ more.
 
 ## aceCreateDomLine
 
-Called from: src/static/js/domline.js
+Called from: `src/static/js/domline.js`
 
 Things in context:
 
@@ -78,7 +78,7 @@ question, and cls will be the new class of the element going forward.
 
 ## acePostWriteDomLineHTML
 
-Called from: src/static/js/domline.js
+Called from: `src/static/js/domline.js`
 
 Things in context:
 
@@ -89,7 +89,7 @@ page.
 
 ## aceAttribsToClasses
 
-Called from: src/static/js/linestylefilter.js
+Called from: `src/static/js/linestylefilter.js`
 
 Things in context:
 
@@ -107,7 +107,7 @@ be parsed into a valid class string.
 
 ## aceAttribClasses
 
-Called from: src/static/js/linestylefilter.js
+Called from: `src/static/js/linestylefilter.js`
 
 Things in context:
 1. Attributes - Object of Attributes
@@ -125,7 +125,7 @@ exports.aceAttribClasses = function(hook_name, attr, cb){
 
 ## aceGetFilterStack
 
-Called from: src/static/js/linestylefilter.js
+Called from: `src/static/js/linestylefilter.js`
 
 Things in context:
 
@@ -141,7 +141,7 @@ later used by the aceCreateDomLine hook (documented above).
 
 ## aceEditorCSS
 
-Called from: src/static/js/ace.js
+Called from: `src/static/js/ace.js`
 
 Things in context: None
 
@@ -150,7 +150,7 @@ should be an array of resource urls or paths relative to the plugins directory.
 
 ## aceInitInnerdocbodyHead
 
-Called from: src/static/js/ace.js
+Called from: `src/static/js/ace.js`
 
 Things in context:
 
@@ -163,7 +163,7 @@ editor HTML document.
 
 ## aceEditEvent
 
-Called from: src/static/js/ace2_inner.js
+Called from: `src/static/js/ace2_inner.js`
 
 Things in context:
 
@@ -180,7 +180,7 @@ your plugin) that use the information provided by the edit event.
 
 ## aceRegisterNonScrollableEditEvents
 
-Called from: src/static/js/ace2_inner.js
+Called from: `src/static/js/ace2_inner.js`
 
 Things in context: None
 
@@ -199,7 +199,7 @@ exports.aceRegisterNonScrollableEditEvents = function(){
 
 ## aceRegisterBlockElements
 
-Called from: src/static/js/ace2_inner.js
+Called from: `src/static/js/ace2_inner.js`
 
 Things in context: None
 
@@ -209,7 +209,7 @@ call for those elements.
 
 ## aceInitialized
 
-Called from: src/static/js/ace2_inner.js
+Called from: `src/static/js/ace2_inner.js`
 
 Things in context:
 
@@ -224,7 +224,7 @@ use in formatting hooks.
 
 ## postAceInit
 
-Called from: src/static/js/pad.js
+Called from: `src/static/js/pad.js`
 
 Things in context:
 
@@ -236,7 +236,7 @@ Things in context:
 
 ## postToolbarInit
 
-Called from: src/static/js/pad_editbar.js
+Called from: `src/static/js/pad_editbar.js`
 
 Things in context:
 
@@ -251,14 +251,14 @@ Usage examples:
 
 ## postTimesliderInit
 
-Called from: src/static/js/timeslider.js
+Called from: `src/static/js/timeslider.js`
 
 There doesn't appear to be any example available of this particular hook being
 used, but it gets fired after the timeslider is all set up.
 
 ## goToRevisionEvent
 
-Called from: src/static/js/broadcast.js
+Called from: `src/static/js/broadcast.js`
 
 Things in context:
 
@@ -270,7 +270,7 @@ be any example available of this particular hook being used.
 
 ## userJoinOrUpdate
 
-Called from: src/static/js/pad_userlist.js
+Called from: `src/static/js/pad_userlist.js`
 
 Things in context:
 
@@ -329,7 +329,7 @@ Context properties:
 
 ## collectContentPre
 
-Called from: src/static/js/contentcollector.js
+Called from: `src/static/js/contentcollector.js`
 
 Things in context:
 
@@ -353,7 +353,7 @@ If you want to specify also a value, call cc.doAttrib(state,
 
 ## collectContentImage
 
-Called from: src/static/js/contentcollector.js
+Called from: `src/static/js/contentcollector.js`
 
 Things in context:
 
@@ -379,7 +379,7 @@ exports.collectContentImage = function(name, context){
 
 ## collectContentPost
 
-Called from: src/static/js/contentcollector.js
+Called from: `src/static/js/contentcollector.js`
 
 Things in context:
 
@@ -428,7 +428,7 @@ This hook is provided to allow a plugin to turn DOM node selection into
 
 ## aceKeyEvent
 
-Called from: src/static/js/ace2_inner.js
+Called from: `src/static/js/ace2_inner.js`
 
 Things in context:
 
@@ -443,7 +443,7 @@ The return value should be true if you have handled the event.
 
 ## collectContentLineText
 
-Called from: src/static/js/contentcollector.js
+Called from: `src/static/js/contentcollector.js`
 
 Things in context:
 
@@ -470,7 +470,7 @@ exports.collectContentLineText = (hookName, context) => {
 
 ## collectContentLineBreak
 
-Called from: src/static/js/contentcollector.js
+Called from: `src/static/js/contentcollector.js`
 
 Things in context:
 
@@ -483,7 +483,7 @@ domline or not. The return value should be either true(break the line) or false.
 
 ## disableAuthorColorsForThisLine
 
-Called from: src/static/js/linestylefilter.js
+Called from: `src/static/js/linestylefilter.js`
 
 Things in context:
 
@@ -499,7 +499,7 @@ deliniation. The return value should be either true(disable) or false.
 
 ## aceSetAuthorStyle
 
-Called from: src/static/js/ace2_inner.js
+Called from: `src/static/js/ace2_inner.js`
 
 Things in context:
 
@@ -516,7 +516,7 @@ hooks should return 1 if the plugin handles highlighting. If no plugin returns
 
 ## aceSelectionChanged
 
-Called from: src/static/js/ace2_inner.js
+Called from: `src/static/js/ace2_inner.js`
 
 Things in context:
 

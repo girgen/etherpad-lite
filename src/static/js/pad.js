@@ -24,11 +24,14 @@
 
 let socket;
 
+
 // These jQuery things should create local references, but for now `require()`
 // assigns to the global `$` and augments it with plugins.
 require('./vendors/jquery');
 require('./vendors/farbtastic');
 require('./vendors/gritter');
+
+import html10n from './vendors/html10n'
 
 const Cookies = require('./pad_utils').Cookies;
 const chat = require('./chat').chat;
@@ -95,24 +98,20 @@ const getParameters = [
       settings.useMonospaceFontGlobal = true;
     },
   },
-  // If the username is set as a parameter we should set a global value that we can call once we
-  // have initiated the pad.
   {
     name: 'userName',
     checkVal: null,
     callback: (val) => {
-      settings.globalUserName = decodeURIComponent(val);
-      clientVars.userName = decodeURIComponent(val);
+      settings.globalUserName = val;
+      clientVars.userName = val;
     },
   },
-  // If the userColor is set as a parameter, set a global value to use once we have initiated the
-  // pad.
   {
     name: 'userColor',
     checkVal: null,
     callback: (val) => {
-      settings.globalUserColor = decodeURIComponent(val);
-      clientVars.userColor = decodeURIComponent(val);
+      settings.globalUserColor = val;
+      clientVars.userColor = val;
     },
   },
   {
@@ -140,7 +139,8 @@ const getParameters = [
     name: 'lang',
     checkVal: null,
     callback: (val) => {
-      window.html10n.localize([val, 'en']);
+      console.log('Val is', val)
+      html10n.localize([val, 'en']);
       Cookies.set('language', val);
     },
   },
@@ -149,8 +149,10 @@ const getParameters = [
 const getParams = () => {
   // Tries server enforced options first..
   for (const setting of getParameters) {
-    const value = clientVars.padOptions[setting.name];
-    if (value.toString() === setting.checkVal) {
+    let value = clientVars.padOptions[setting.name];
+    if (value == null) continue;
+    value = value.toString();
+    if (value === setting.checkVal || setting.checkVal == null) {
       setting.callback(value);
     }
   }
@@ -169,7 +171,7 @@ const getUrlVars = () => new URL(window.location.href).searchParams;
 
 const sendClientReady = (isReconnect) => {
   let padId = document.location.pathname.substring(document.location.pathname.lastIndexOf('/') + 1);
-  // unescape neccesary due to Safari and Opera interpretation of spaces
+  // unescape necessary due to Safari and Opera interpretation of spaces
   padId = decodeURIComponent(padId);
 
   if (!isReconnect) {
@@ -179,8 +181,8 @@ const sendClientReady = (isReconnect) => {
   }
 
   let token = Cookies.get('token');
-  if (token == null) {
-    token = `t.${randomString()}`;
+  if (token == null || !padutils.isValidAuthorToken(token)) {
+    token = padutils.generateAuthorToken();
     Cookies.set('token', token, {expires: 60});
   }
 
@@ -209,13 +211,13 @@ const sendClientReady = (isReconnect) => {
     msg.reconnect = true;
   }
 
-  socket.json.send(msg);
+  socket.emit("message", msg);
 };
 
 const handshake = async () => {
   let receivedClientVars = false;
   let padId = document.location.pathname.substring(document.location.pathname.lastIndexOf('/') + 1);
-  // unescape neccesary due to Safari and Opera interpretation of spaces
+  // unescape necessary due to Safari and Opera interpretation of spaces
   padId = decodeURIComponent(padId);
 
   // padId is used here for sharding / scaling.  We prefix the padId with padId: so it's clear
@@ -232,7 +234,7 @@ const handshake = async () => {
     sendClientReady(false);
   });
 
-  socket.on('reconnect', () => {
+  socket.io.on('reconnect', () => {
     // pad.collabClient might be null if the hanshake failed (or it never got that far).
     if (pad.collabClient != null) {
       pad.collabClient.setChannelState('CONNECTED');
@@ -252,14 +254,29 @@ const handshake = async () => {
   socket.on('disconnect', (reason) => {
     // The socket.io client will automatically try to reconnect for all reasons other than "io
     // server disconnect".
-    if (reason !== 'io server disconnect') return;
+    console.log(`Socket disconnected: ${reason}`)
+    //if (reason !== 'io server disconnect' || reason !== 'ping timeout') return;
     socketReconnecting();
-    socket.connect();
   });
 
-  socket.on('reconnecting', socketReconnecting);
 
-  socket.on('reconnect_failed', (error) => {
+  socket.on('shout', (obj) => {
+    if(obj.type === "COLLABROOM") {
+      let date = new Date(obj.data.payload.timestamp);
+      $.gritter.add({
+        // (string | mandatory) the heading of the notification
+        title: 'Admin message',
+        // (string | mandatory) the text inside the notification
+        text: '[' + date.toLocaleTimeString() + ']: ' + obj.data.payload.message.message,
+        // (bool | optional) if you want it to fade out on its own or just sit there
+        sticky: obj.data.payload.message.sticky
+      });
+    }
+  })
+
+  socket.io.on('reconnect_attempt', socketReconnecting);
+
+  socket.io.on('reconnect_failed', (error) => {
     // pad.collabClient might be null if the hanshake failed (or it never got that far).
     if (pad.collabClient != null) {
       pad.collabClient.setChannelState('DISCONNECTED', 'reconnect_timeout');
@@ -267,6 +284,7 @@ const handshake = async () => {
       throw new Error('Reconnect timed out');
     }
   });
+
 
   socket.on('error', (error) => {
     // pad.collabClient might be null if the error occurred before the hanshake completed.
@@ -295,6 +313,20 @@ const handshake = async () => {
     } else if (!receivedClientVars && obj.type === 'CLIENT_VARS') {
       receivedClientVars = true;
       window.clientVars = obj.data;
+      if (window.clientVars.sessionRefreshInterval) {
+        const ping =
+            () => $.ajax('../_extendExpressSessionLifetime', {method: 'PUT'}).catch(() => {});
+        setInterval(ping, window.clientVars.sessionRefreshInterval);
+      }
+      if(window.clientVars.mode === "development") {
+        console.warn('Enabling development mode with live update')
+        socket.on('liveupdate', ()=>{
+
+          console.log('Live reload update received')
+          location.reload()
+        })
+      }
+
     } else if (obj.disconnect) {
       window.console && console.warn("FORCED TO DISCONNECT");
       window.console && console.warn(obj);
@@ -411,10 +443,12 @@ const pad = {
       setTimeout(() => {
         padeditor.ace.focus();
       }, 0);
+      const optionsStickyChat = $('#options-stickychat');
+      optionsStickyChat.on('click', () => { chat.stickToScreen(); });
       // if we have a cookie for always showing chat then show it
       if (padcookie.getPref('chatAlwaysVisible')) {
         chat.stickToScreen(true); // stick it to the screen
-        $('#options-stickychat').prop('checked', true); // set the checkbox to on
+        optionsStickyChat.prop('checked', true); // set the checkbox to on
       }
       // if we have a cookie for always showing chat then show it
       if (padcookie.getPref('chatAndUsers')) {
@@ -436,8 +470,8 @@ const pad = {
       // Prevent sticky chat or chat and users to be checked for mobiles
       const checkChatAndUsersVisibility = (x) => {
         if (x.matches) { // If media query matches
-          $('#options-chatandusers:checked').click();
-          $('#options-stickychat:checked').click();
+          $('#options-chatandusers:checked').trigger('click');
+          $('#options-stickychat:checked').trigger('click');
         }
       };
       const mobileMatch = window.matchMedia('(max-width: 800px)');
@@ -695,7 +729,7 @@ const pad = {
       $.ajax(
           {
             type: 'post',
-            url: 'ep/pad/connection-diagnostic-info',
+            url: '../ep/pad/connection-diagnostic-info',
             data: {
               diagnosticInfo: JSON.stringify(pad.diagnosticInfo),
             },
@@ -710,7 +744,7 @@ const pad = {
     $('form#reconnectform input.diagnosticInfo').val(JSON.stringify(pad.diagnosticInfo));
     $('form#reconnectform input.missedChanges')
         .val(JSON.stringify(pad.collabClient.getMissedChanges()));
-    $('form#reconnectform').submit();
+    $('form#reconnectform').trigger('submit');
   },
   callWhenNotCommitting: (f) => {
     pad.collabClient.callWhenNotCommitting(f);
