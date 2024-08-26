@@ -50,5 +50,10 @@
     "url": "https://github.com/ether/etherpad-lite.git"
   },
   "version": "2.2.2",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "pnpm": {
+    "overrides": {
+      "rollup": "npm:@rollup/wasm-node"
+    }
+  }
 }
