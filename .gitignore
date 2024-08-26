@@ -31,3 +31,6 @@ plugin_packages
 playwright-report
 state.json
 /src/static/oidc
+src/.ep_initialized
+src/static/custom/
+
